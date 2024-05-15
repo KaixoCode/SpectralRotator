@@ -33,7 +33,13 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
         
     private:
+        std::vector<Stereo> m_SineSweep;
         std::vector<Stereo> m_Buffer;
+
+        // ------------------------------------------------
+        
+        float m_Phase = 0;
+        float m_Progress = 0;
 
         // ------------------------------------------------
 

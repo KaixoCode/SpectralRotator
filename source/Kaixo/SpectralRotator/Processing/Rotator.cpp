@@ -10,7 +10,7 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     void SineSweepConvolver::trigger() {
-
+        m_Phase = 0;
     }
 
     void SineSweepConvolver::finish() {
@@ -18,7 +18,7 @@ namespace Kaixo::Processing {
     }
 
     void SineSweepConvolver::progress(float progress) {
-
+        m_Progress = progress;
     }
 
     // ------------------------------------------------
