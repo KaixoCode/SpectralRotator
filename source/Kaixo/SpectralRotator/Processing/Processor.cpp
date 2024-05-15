@@ -19,6 +19,7 @@ namespace Kaixo::Processing {
 
     SpectralRotatorProcessor::SpectralRotatorProcessor() {
         registerModule(parameters);
+        registerModule(m_RingModulator);
     }
 
     // ------------------------------------------------
@@ -29,7 +30,20 @@ namespace Kaixo::Processing {
         for (std::size_t i = 0; i < outputBuffer().size(); ++i) {
             parameters.process();
 
-            outputBuffer()[i] = inputBuffer()[i];
+            if (progress == 0) {
+                m_RingModulator.reset();
+            }
+
+            m_RingModulator.progress(progress);
+
+            Stereo input = inputBuffer()[i];
+
+            m_RingModulator.input = input;
+            m_RingModulator.process();
+
+            Stereo output = m_RingModulator.output;
+
+            outputBuffer()[i] = output;
         }
 
         double nanos = timer.time<std::chrono::nanoseconds>();

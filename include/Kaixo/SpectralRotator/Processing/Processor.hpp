@@ -9,6 +9,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/SpectralRotator/Controller.hpp"
+#include "Kaixo/SpectralRotator/Processing/Rotator.hpp"
 
 // ------------------------------------------------
 
@@ -48,6 +49,11 @@ namespace Kaixo::Processing {
         float timerPercentMax = 0;
         float timerNanosPerSampleMax = 0;
         std::chrono::time_point<std::chrono::steady_clock> lastMeasure;
+
+        // ------------------------------------------------
+        
+    private:
+        RingModulator m_RingModulator{};
 
         // ------------------------------------------------
 
