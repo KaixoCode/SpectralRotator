@@ -13,65 +13,74 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    class SineSweepConvolver : public Module {
-    public:
+    struct alignas(8) AudioFrame {
 
         // ------------------------------------------------
 
-        void trigger(); // Triggers the convolver
-        void finish(); // Signals that the sweep is done 
-
-        void progress(float progress); // Sets progress in sweep
+        float l = 0;
+        float r = 0;
 
         // ------------------------------------------------
 
-        bool active() const override { return true; }
-        void process() override;
-        void prepare(double sampleRate, std::size_t maxBufferSize) override;
-        void reset() override;
-
-        // ------------------------------------------------
-        
-    private:
-        std::vector<Stereo> m_SineSweep;
-        std::vector<Stereo> m_Buffer;
-
-        // ------------------------------------------------
-        
-        float m_Phase = 0;
-        float m_Progress = 0;
-
-        // ------------------------------------------------
-
+        constexpr AudioFrame & operator=(float other) { l = other, r = other; return *this; }
+        constexpr AudioFrame & operator+=(const AudioFrame& other) { l += other.l, r += other.r; return *this; }
+        constexpr AudioFrame & operator-=(const AudioFrame& other) { l -= other.l, r -= other.r; return *this; }
+        constexpr AudioFrame & operator*=(const AudioFrame& other) { l *= other.l, r *= other.r; return *this; }
+        constexpr AudioFrame & operator/=(const AudioFrame& other) { l /= other.l, r /= other.r; return *this; }
+        constexpr AudioFrame & operator+=(float other) { l += other, r += other; return *this; }
+        constexpr AudioFrame & operator-=(float other) { l -= other, r -= other; return *this; }
+        constexpr AudioFrame & operator*=(float other) { l *= other, r *= other; return *this; }
+        constexpr AudioFrame & operator/=(float other) { l /= other, r /= other; return *this; }
+        constexpr friend AudioFrame operator-(const AudioFrame& a) { return { -a.l, -a.r }; }
+        constexpr friend AudioFrame operator+(const AudioFrame& a, const AudioFrame& b) { return { a.l + b.l, a.r + b.r }; }
+        constexpr friend AudioFrame operator-(const AudioFrame& a, const AudioFrame& b) { return { a.l - b.l, a.r - b.r }; }
+        constexpr friend AudioFrame operator*(const AudioFrame& a, const AudioFrame& b) { return { a.l * b.l, a.r * b.r }; }
+        constexpr friend AudioFrame operator/(const AudioFrame& a, const AudioFrame& b) { return { a.l / b.l, a.r / b.r }; }
+        constexpr friend AudioFrame operator+(const AudioFrame& a, float b) { return { a.l + b, a.r + b }; }
+        constexpr friend AudioFrame operator-(const AudioFrame& a, float b) { return { a.l - b, a.r - b }; }
+        constexpr friend AudioFrame operator*(const AudioFrame& a, float b) { return { a.l * b, a.r * b }; }
+        constexpr friend AudioFrame operator/(const AudioFrame& a, float b) { return { a.l / b, a.r / b }; }
+        constexpr friend AudioFrame operator+(float a, const AudioFrame& b) { return { a + b.l, a + b.r }; }
+        constexpr friend AudioFrame operator-(float a, const AudioFrame& b) { return { a - b.l, a - b.r }; }
+        constexpr friend AudioFrame operator*(float a, const AudioFrame& b) { return { a * b.l, a * b.r }; }
+        constexpr friend AudioFrame operator/(float a, const AudioFrame& b) { return { a / b.l, a / b.r }; }
+        constexpr friend bool operator==(const AudioFrame& a, const AudioFrame& b) { return a.l == b.l && a.r == b.r; }
+        constexpr friend bool operator!=(const AudioFrame& a, const AudioFrame& b) { return a.l != b.l && a.r != b.r; }
+        constexpr friend bool operator==(const AudioFrame& a, float b) { return a.l == b && a.r == b; }
+        constexpr friend bool operator!=(const AudioFrame& a, float b) { return a.l != b && a.r != b; }
+        constexpr friend bool operator==(float a, const AudioFrame& b) { return a == b.l && a == b.r; }
+        constexpr friend bool operator!=(float a, const AudioFrame& b) { return a != b.l && a != b.r; }
+        constexpr float& operator[](bool value) { return value ? r : l; }
+        constexpr const float& operator[](bool value) const { return value ? r : l; }
+        constexpr float sum() const noexcept { return r + l; }
+        constexpr float average() const noexcept { return sum() / 2; }
     };
 
     // ------------------------------------------------
     
-    class RingModulator : public Module {
+    using AudioBuffer = std::vector<AudioFrame>;
+
+    // ------------------------------------------------
+    
+    /**
+     * Steps for rotating spectrum 90 degrees:
+     *  - Generate an FFT'ed sine sweep of same length as input buffer
+     *  - FFT the input buffer
+     *  - Convolve FFT'ed input buffer with FFT'ed sine sweep
+     *  - Apply Hilbert filter (remove negative frequencies)
+     *  - IFFT
+     *  - Apply ringmod to do a frequency shift
+     *  - FFT
+     *  - Convolve with the FFT'ed sine sweep again
+     *  - IFFT
+     *  - Convert resulting complex data back into audio samples
+     */
+    class Rotator {
     public:
 
         // ------------------------------------------------
-        
-        Stereo input;
-        Stereo output;
 
-        // ------------------------------------------------
-
-        void trigger();
-        void finish();
-
-        void progress(float progress);
-
-        // ------------------------------------------------
-
-        bool active() const override { return true; }
-        void process() override;
-        
-        // ------------------------------------------------
-        
-    private:
-        float m_Progress = 0;
-        float m_Phase = 0;
+        static AudioBuffer rotate(const AudioBuffer& buffer);
 
         // ------------------------------------------------
 

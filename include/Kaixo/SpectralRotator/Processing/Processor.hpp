@@ -51,11 +51,6 @@ namespace Kaixo::Processing {
         std::chrono::time_point<std::chrono::steady_clock> lastMeasure;
 
         // ------------------------------------------------
-        
-    private:
-        RingModulator m_RingModulator{};
-
-        // ------------------------------------------------
 
     };
 
