@@ -10,6 +10,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/SpectralRotator/Controller.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces.hpp"
 
 // ------------------------------------------------
 
@@ -23,6 +24,12 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
 
         MainView(Context c);
+
+        // ------------------------------------------------
+
+        Processing::InterfaceStorage<Processing::FileInterface> inputFileInterface;
+        Processing::InterfaceStorage<Processing::FileInterface> rotatedFileInterface;
+        Processing::InterfaceStorage<Processing::FileInterface> revertedFileInterface;
 
         // ------------------------------------------------
 

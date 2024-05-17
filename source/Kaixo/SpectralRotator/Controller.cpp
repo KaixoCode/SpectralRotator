@@ -35,21 +35,6 @@ namespace Kaixo {
         Gui::T.initialize();
 
         // ------------------------------------------------
-        
-        AudioFile file;
-        file.open("D:/MP3/clean sine.wav");
-
-        AudioFile out;
-        Processing::Rotator rotate;
-        out.buffer = rotate.rotate(file.buffer);
-
-        std::reverse(out.buffer.begin(), out.buffer.end());
-        
-        out.buffer = rotate.rotate(out.buffer);
-
-        out.write("D:/MP3/generated_sound1.wav");
-
-        // ------------------------------------------------
 
         data<ControllerData>();
 

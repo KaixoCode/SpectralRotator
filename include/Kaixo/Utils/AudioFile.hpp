@@ -18,16 +18,18 @@ namespace Kaixo {
 
 		// ------------------------------------------------
 
-		bool open(const std::string& file);
+		bool open(std::filesystem::path file);
 
 		// ------------------------------------------------
 
-		std::string file{};
-		Processing::AudioBuffer buffer;
+		std::filesystem::path path{};
+		Processing::AudioBuffer buffer{};
 
 		// ------------------------------------------------
 		
-		void write(const std::string& file);
+		void write(std::filesystem::path file);
+
+		void save(std::string filename = "rotated");
 
 		// ------------------------------------------------
 

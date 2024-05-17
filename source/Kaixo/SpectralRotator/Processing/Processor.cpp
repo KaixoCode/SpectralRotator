@@ -6,6 +6,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/Utils/Timer.hpp"
+#include "Kaixo/Core/Processing/Resampler.hpp"
 
 // ------------------------------------------------
 
@@ -16,9 +17,80 @@
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
+    
+    void FileHandler::process() {
+        readingFile = true;
+        if (!playing || openingFile) {
+            output = 0;
+            readingFile = false;
+            return;
+        }
+
+        resampler.samplerate.in = file.buffer.sampleRate;
+        resampler.samplerate.out = sampleRate();
+        output = resampler.generate([&]() -> Stereo {
+            if (playbackPosition < file.buffer.size()) {
+                Stereo result = {
+                    file.buffer[playbackPosition].l,
+                    file.buffer[playbackPosition].r,
+                };
+
+                ++playbackPosition;
+
+                return result;
+            } else {
+                playing = false;
+                return { 0, 0 };
+            }
+        });
+
+        readingFile = false;
+    }
+
+    // ------------------------------------------------
+
+    void FileHandler::trigger() {
+        if (playing) {
+            playing = false;
+        } else {
+            playbackPosition = 0;
+            playing = true;
+        }
+    }
+
+    // ------------------------------------------------
+
+    void FileHandler::open(std::filesystem::path path) {
+        openingFile = true;
+        while (readingFile) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        file.open(path);
+        openingFile = false;
+    }
+
+    void FileHandler::rotate(FileHandler& destination, bool direction, std::size_t originalSize) {
+        openingFile = true;
+        while (readingFile) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        destination.file.buffer = Rotator::rotate(file.buffer, direction, originalSize);
+        destination.file.save(file.path.stem().string());
+
+        openingFile = false;
+    }
+
+    // ------------------------------------------------
 
     SpectralRotatorProcessor::SpectralRotatorProcessor() {
         registerModule(parameters);
+        registerModule(inputFile);
+        registerModule(rotatedFile);
+        registerModule(revertedFile);
+
+        registerInterface<FileInterface>();
     }
 
     // ------------------------------------------------
@@ -29,7 +101,14 @@ namespace Kaixo::Processing {
         for (std::size_t i = 0; i < outputBuffer().size(); ++i) {
             parameters.process();
 
-            outputBuffer()[i] = inputBuffer()[i];
+            inputFile.process();
+            rotatedFile.process();
+            revertedFile.process();
+
+            Stereo input = inputBuffer()[i];
+            input += inputFile.output + rotatedFile.output + revertedFile.output;
+
+            outputBuffer()[i] = input;
         }
 
         double nanos = timer.time<std::chrono::nanoseconds>();

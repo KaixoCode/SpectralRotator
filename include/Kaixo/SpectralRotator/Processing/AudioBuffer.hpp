@@ -6,35 +6,31 @@
 // ------------------------------------------------
 
 #include "Kaixo/Core/Definitions.hpp"
-#include "Kaixo/Core/Processing/Interface.hpp"
+
+// ------------------------------------------------
+
+#include "Kaixo/SpectralRotator/Processing/AudioFrame.hpp"
 
 // ------------------------------------------------
 
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
-    
-    class FileInterface : public Interface {
+
+    class AudioBuffer : public std::vector<AudioFrame> {
     public:
 
         // ------------------------------------------------
-        
-        struct Settings {
-            std::size_t index;
-        } settings;
+
+        using std::vector<AudioFrame>::vector;
 
         // ------------------------------------------------
 
-        void rotate();
-        void openFile(std::filesystem::path path);
-        void trigger();
-        std::filesystem::path path();
+        double sampleRate = 0;
 
         // ------------------------------------------------
 
     };
-
-    // ------------------------------------------------
 
 }
 

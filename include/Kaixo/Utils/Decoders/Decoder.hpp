@@ -41,6 +41,7 @@ namespace Kaixo {
 	inline bool decodeMP3(Processing::AudioBuffer& buffer, const std::string& path) {
 		drmp3 mp3;
 		if (!drmp3_init_file( & mp3, path.c_str(), NULL)) return false;
+		if (mp3.channels == 0) return false;
 		
 		//buffer.samplerate = mp3.sampleRate;
 		auto frames = drmp3_get_pcm_frame_count(&mp3);
@@ -67,9 +68,8 @@ namespace Kaixo {
 	inline bool decodeWAV(Processing::AudioBuffer& buffer, const std::string& path) {
 		drwav wav;
 		if (!drwav_init_file(&wav, path.c_str(), NULL)) return false;
-		if (wav.channels != 2) return false; // Only stereo supported
+		if (wav.channels == 0) return false;
 
-		//buffer.samplerate = wav.sampleRate;
 		auto frames = wav.totalPCMFrameCount;
 		if (frames == 0) return false; // 0 frames means error
 
@@ -84,6 +84,7 @@ namespace Kaixo {
 				buffer[i] = { raw[i * wav.channels], raw[i * wav.channels + 1] };
 			}
 		}
+		buffer.sampleRate = wav.sampleRate;
 
 		drwav_uninit(&wav);
 		return true;
@@ -104,7 +105,7 @@ namespace Kaixo {
 			float sample = 2 * static_cast<float>(value) / std::numeric_limits<std::uint16_t>::max() - 1;
 			buffer[i] = sample;
 		}
-		//buffer.samplerate = 48000;
+		buffer.sampleRate = 48000;
 
 		return true;
 	}
@@ -130,7 +131,7 @@ namespace Kaixo {
 		drwav_data_format format{};
 		format.bitsPerSample = 32;
 		format.channels = 2;
-		format.sampleRate = 48000;
+		format.sampleRate = buffer.sampleRate;
 		format.container = drwav_container_riff;
 		format.format = DR_WAVE_FORMAT_IEEE_FLOAT;
 
