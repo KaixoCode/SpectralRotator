@@ -12,98 +12,19 @@
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
-    //Folowing is for SFINAE    
-    template <typename T>
-    struct extractType;
-
-    template <template <typename ...> class C, typename D>
-    struct extractType<C<D>> { using subType = D; };
-
-    // Cooley–Tukey Fast Fourier Transform algorithm
-    // Recursive Divide and Conquer implementation
-    // Higher memory requirements and redundancy although more intuitive
-    template<typename InputIt,
-        typename value_type = typename std::iterator_traits<InputIt>::value_type>
-    typename std::enable_if<std::is_same<value_type,
-        std::complex<typename extractType<value_type>::subType>>::value,
-        void>::type // Only accepts std::complex numbers containers 
-        FFT2(InputIt begin, InputIt end)
-    {
-        typename std::iterator_traits<InputIt>::difference_type N = std::distance(begin, end);
-
-        if (N < 2) return;
-        else {
-            // divide
-            std::stable_partition(begin, end, [&begin](auto& a) {
-                return std::distance(&*begin, &a) % 2 == 0; // pair indexes on the first half and odd on the last
-                });
-
-            //conquer
-            FFT2(begin, begin + N / 2);   // recurse even items
-            FFT2(begin + N / 2, end);   // recurse odd  items
-
-            //combine
-            for (decltype(N) k = 0; k < N / 2; ++k) {
-                value_type even = *(begin + k);
-                value_type odd = *(begin + k + N / 2);
-                value_type w = std::exp(value_type(0, -2. * std::numbers::pi_v<float> * k / N)) * odd;
-
-                *(begin + k) = even + w;
-                *(begin + k + N / 2) = even - w;
-            }
-        }
-    }
-
-    // Inverse FFT
-    template<typename InputIt,
-        typename value_type = typename std::iterator_traits<InputIt>::value_type>
-    typename std::enable_if<std::is_same<value_type,
-        std::complex<typename extractType<value_type>::subType>>::value,
-        void>::type
-        IFFT2(InputIt begin, InputIt end)
-    {
-        typename std::iterator_traits<InputIt>::difference_type N = std::distance(begin, end);
-
-        if (N < 2) return;
-        else {
-            // divide
-            std::stable_partition(begin, end, [&begin](auto& a) {
-                a = std::conj(a); // use the conjugate value
-                return std::distance(&*begin, &a) % 2 == 0; // pair indexes on the first half and odd on the last
-                });
-
-            //conquer
-            FFT2(begin, begin + N / 2);   // recurse even items on normal FFT
-            FFT2(begin + N / 2, end);   // recurse odd  items on normal FFT
-
-            //combine
-            for (decltype(N) k = 0; k < N / 2; ++k) {
-                value_type even = *(begin + k);
-                value_type odd = *(begin + k + N / 2);
-                value_type w = std::exp(value_type(0, -2. * std::numbers::pi_v<float> * k / N)) * odd;
-
-                *(begin + k) = std::conj(even + w); //conjugate again and scale 
-                *(begin + k) /= N;
-                *(begin + k + N / 2) = std::conj(even - w);
-                *(begin + k + N / 2) /= N;
-            }
-        }
-    }
-
-    // ------------------------------------------------
 
     struct ComplexBuffer {
         std::vector<std::complex<float>> l;
         std::vector<std::complex<float>> r;
 
-        std::size_t size() const { return l.size(); }
+        constexpr std::size_t size() const { return l.size(); }
 
-        void reserve(std::size_t size) {
+        constexpr void reserve(std::size_t size) {
             l.reserve(size);
             r.reserve(size);
         }
 
-        void resize(std::size_t size) {
+        constexpr void resize(std::size_t size) {
             l.resize(size);
             r.resize(size);
         }
@@ -111,28 +32,67 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void fft(ComplexBuffer& buffer) {
-        FFT2(buffer.l.begin(), buffer.l.end());
-        FFT2(buffer.r.begin(), buffer.r.end());
+    constexpr void fftImpl(std::vector<std::complex<float>>& x, bool inverse = false) {
+        std::vector<std::complex<float>> w(x.size(), 0.0f);
+
+        w[0] = 1.0f;
+        for (std::size_t pow2 = 1; pow2 < x.size(); pow2 *= 2) {
+            w[pow2] = std::polar(1.0f, 2 * std::numbers::pi_v<float> * pow2 / x.size() * (inverse ? 1 : -1));
+        }
+
+        for (std::size_t i = 3, last = 2; i < x.size(); i++) {
+            if (w[i] == 0.0f) {
+                w[i] = w[last] * w[i - last];
+            }
+            else {
+                last = i;
+            }
+        }
+
+        std::vector<std::complex<float>> newX(x.size());
+        for (std::size_t blockSize = x.size(); blockSize > 1; blockSize /= 2) {
+            for (std::size_t start = 0; start < x.size(); start += blockSize) {
+                for (std::size_t i = 0; i < blockSize; i++) {
+                    newX[start + blockSize / 2 * (i % 2) + i / 2] = x[start + i];
+                }
+            }
+            x = newX;
+        }
+
+        for (std::size_t blockSize = 2; blockSize <= x.size(); blockSize *= 2) {
+            std::size_t wBaseI = x.size() / blockSize;
+            for (std::size_t start = 0; start < x.size(); start += blockSize) {
+                for (std::size_t i = 0; i < blockSize / 2; i++) {
+                    newX[start + i] = x[start + i] + w[wBaseI * i] * x[start + blockSize / 2 + i];
+                    newX[start + blockSize / 2 + i] = x[start + i] - w[wBaseI * i] * x[start + blockSize / 2 + i];
+                }
+            }
+            x = newX;
+        }
     }
 
-    void ifft(ComplexBuffer& buffer) {
-        IFFT2(buffer.l.begin(), buffer.l.end());
-        IFFT2(buffer.r.begin(), buffer.r.end());
+    constexpr void fft(ComplexBuffer& buffer) {
+        fftImpl(buffer.l, false);
+        fftImpl(buffer.r, false);
+    }
+
+    constexpr void ifft(ComplexBuffer& buffer) {
+        fftImpl(buffer.l, true);
+        fftImpl(buffer.r, true);
     }
 
     // ------------------------------------------------
 
-    ComplexBuffer generateSineSweep(std::size_t size) {
+    constexpr ComplexBuffer generateSineSweep(std::size_t size) {
         const auto nextPower2 = std::bit_ceil(size * 2);
 
         ComplexBuffer sweep;
         sweep.resize(nextPower2);
 
         float phase = 0;
-
         for (std::size_t i = 0; i < size; ++i) {
-            float deltaPhase = 0.5 * static_cast<float>(i) / size;
+            float progress = static_cast<float>(i) / size;
+            float deltaPhase = 0.5 * progress;
             float sine = Math::nsin(phase);
 
             sweep.l[i] = sine;
@@ -141,16 +101,6 @@ namespace Kaixo::Processing {
             phase = Math::Fast::fmod1(phase + deltaPhase);
         }
         
-        for (std::size_t i = 0; i < size; ++i) {
-            float deltaPhase = 0.5;
-            float sine = Math::nsin(phase);
-
-            sweep.l[i + size] = sine;
-            sweep.r[i + size] = sine;
-
-            phase = Math::Fast::fmod1(phase + deltaPhase);
-        }
-
         fft(sweep);
 
         return sweep;
@@ -158,8 +108,8 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void convolve(ComplexBuffer& a, const ComplexBuffer& b) {
-        const std::size_t size = std::min(a.size(), b.size());
+    constexpr void convolve(ComplexBuffer& a, const ComplexBuffer& b) {
+        const std::size_t size = Math::Fast::min(a.size(), b.size());
 
         for (std::size_t i = 0; i < size; ++i) a.l[i] *= b.l[i];
         for (std::size_t i = 0; i < size; ++i) a.r[i] *= b.r[i];
@@ -167,7 +117,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void hilbert(ComplexBuffer& in, bool positive) {
+    constexpr void hilbert(ComplexBuffer& in, bool positive) {
         const std::size_t nyquist = in.size() / 2;
 
         if (positive) {
@@ -181,7 +131,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void ringmod(ComplexBuffer& in, std::size_t originalSize) {
+    constexpr void ringmod(ComplexBuffer& in, std::size_t originalSize) {
         float phase = 0;
 
         for (std::size_t i = 0; i < originalSize * 2; ++i) {
@@ -240,17 +190,8 @@ namespace Kaixo::Processing {
         ifft(result);
 
         AudioBuffer output;
-        //output.resize(nextPower2);
-        //
-        //for (std::size_t i = 0; i < nextPower2; ++i) {
-        //    output[i] = {
-        //        result.l[i].real(),
-        //        result.r[i].real(),
-        //    };
-        //}        
-        
         output.resize(buffer.size());
-
+        
         for (std::size_t i = 0; i < buffer.size(); ++i) {
             output[i] = {
                 result.l[i + buffer.size()].real(),
