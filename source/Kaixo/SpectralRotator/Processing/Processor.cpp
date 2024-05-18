@@ -20,6 +20,12 @@ namespace Kaixo::Processing {
     
     void FileHandler::process() {
         readingFile = true;
+
+        if (newSeekPosition) {
+            resampler.index(seekPosition);
+            newSeekPosition = false;
+        }
+
         if (!playing || openingFile) {
             output = 0;
             readingFile = false;
@@ -28,34 +34,36 @@ namespace Kaixo::Processing {
 
         resampler.samplerate.in = file.buffer.sampleRate;
         resampler.samplerate.out = sampleRate();
-        output = resampler.generate([&]() -> Stereo {
-            if (playbackPosition < file.buffer.size()) {
-                Stereo result = {
-                    file.buffer[playbackPosition].l,
-                    file.buffer[playbackPosition].r,
-                };
+        output = resampler.generate(file.buffer);
 
-                ++playbackPosition;
-
-                return result;
-            } else {
-                playing = false;
-                return { 0, 0 };
-            }
-        });
+        if (resampler.eof()) {
+            playing = false;
+        }
 
         readingFile = false;
     }
 
     // ------------------------------------------------
 
-    void FileHandler::trigger() {
+    void FileHandler::playPause() {
         if (playing) {
             playing = false;
         } else {
-            playbackPosition = 0;
+            if (resampler.eof()) {
+                resampler.index(0);
+            }
             playing = true;
         }
+    }
+
+    void FileHandler::seek(float position) {
+        seekPosition = position * file.buffer.size();
+        newSeekPosition = true;
+    }
+    
+    float FileHandler::position() {
+        if (file.buffer.size() == 0) return 0;
+        return static_cast<float>(resampler.position()) / file.buffer.size();
     }
 
     // ------------------------------------------------
@@ -70,13 +78,13 @@ namespace Kaixo::Processing {
         openingFile = false;
     }
 
-    void FileHandler::rotate(FileHandler& destination, bool direction, std::size_t originalSize) {
+    void FileHandler::rotate(FileHandler& destination, bool direction, const AudioBuffer& originalBuffer) {
         openingFile = true;
         while (readingFile) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
-        destination.file.buffer = Rotator::rotate(file.buffer, direction, originalSize);
+        destination.file.buffer = Rotator::rotate(file.buffer, direction, originalBuffer);
         destination.file.save(file.path.stem().string());
 
         openingFile = false;
@@ -88,7 +96,6 @@ namespace Kaixo::Processing {
         registerModule(parameters);
         registerModule(inputFile);
         registerModule(rotatedFile);
-        registerModule(revertedFile);
 
         registerInterface<FileInterface>();
     }
@@ -103,10 +110,9 @@ namespace Kaixo::Processing {
 
             inputFile.process();
             rotatedFile.process();
-            revertedFile.process();
 
             Stereo input = inputBuffer()[i];
-            input += inputFile.output + rotatedFile.output + revertedFile.output;
+            input += inputFile.output + rotatedFile.output;
 
             outputBuffer()[i] = input;
         }

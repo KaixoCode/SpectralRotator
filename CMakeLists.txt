@@ -13,7 +13,7 @@ set(WEBSITE "https://kaixo.me")
 set(BUNDLE_IDENTIFIER "me.kaixo.spectralrotator")
 set(VERSION "0.0.1")
 set(VERSION_TYPE "SNAPSHOT")
-set(INITIAL_SIZE "200, 300")
+set(INITIAL_SIZE "500, 500")
 set(IS_SYNTH false)
 
 # ==============================================

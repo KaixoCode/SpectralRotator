@@ -1,4 +1,17 @@
 {
   "background": "drawable",
-  "button": "drawable"
+  "button": "drawable",
+  "font": "font",
+
+  "spectrum": {
+    "color1": "color",
+    "color2": "color",
+    "color3": "color",
+    "color4": "color",
+    "color5": "color"
+  },
+
+  "rotator": {
+    "background": "drawable"
+  }
 }

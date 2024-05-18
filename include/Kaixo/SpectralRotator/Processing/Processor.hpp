@@ -4,13 +4,13 @@
 
 #include "Kaixo/Utils/AudioFile.hpp"
 #include "Kaixo/Core/Processing/Processor.hpp"
-#include "Kaixo/Core/Processing/Resampler.hpp"
 #include "Kaixo/Core/Processing/ParameterDatabase.hpp"
 
 // ------------------------------------------------
 
 #include "Kaixo/SpectralRotator/Controller.hpp"
 #include "Kaixo/SpectralRotator/Processing/Rotator.hpp"
+#include "Kaixo/SpectralRotator/Processing/Resampler.hpp"
 
 // ------------------------------------------------
 
@@ -31,12 +31,14 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
         
-        void trigger(); // play audio file
+        void playPause(); // play audio file
+        void seek(float position);
+        float position();
 
         // ------------------------------------------------
         
         void open(std::filesystem::path path);
-        void rotate(FileHandler& destination, bool direction, std::size_t originalSize = npos);
+        void rotate(FileHandler& destination, bool direction, const AudioBuffer& originalBuffer = {});
 
         // ------------------------------------------------
         
@@ -49,11 +51,12 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
     private:
-        std::size_t playbackPosition = 0;
         std::atomic_bool playing = false;
-        Resampler resampler;
+        AudioBufferResampler resampler;
         std::atomic_bool openingFile = false;
         std::atomic_bool readingFile = false;
+        std::atomic_bool newSeekPosition = false;
+        std::size_t seekPosition = 0;
 
         // ------------------------------------------------
 
@@ -83,8 +86,7 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         FileHandler inputFile; // Input audio
-        FileHandler rotatedFile; // First rotation
-        FileHandler revertedFile; // Rotated file rotated back to original rotation
+        FileHandler rotatedFile; // Rotated audio
 
         // ------------------------------------------------
 

@@ -10,6 +10,10 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/SpectralRotator/Processing/AudioBuffer.hpp"
+
+// ------------------------------------------------
+
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
@@ -27,8 +31,13 @@ namespace Kaixo::Processing {
 
         void rotate();
         void openFile(std::filesystem::path path);
-        void trigger();
+
+        void playPause();
+        void seek(float position);
+        float position();
+
         std::filesystem::path path();
+        const AudioBuffer& buffer();
 
         // ------------------------------------------------
 

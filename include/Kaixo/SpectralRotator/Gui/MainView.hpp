@@ -29,7 +29,6 @@ namespace Kaixo::Gui {
 
         Processing::InterfaceStorage<Processing::FileInterface> inputFileInterface;
         Processing::InterfaceStorage<Processing::FileInterface> rotatedFileInterface;
-        Processing::InterfaceStorage<Processing::FileInterface> revertedFileInterface;
 
         // ------------------------------------------------
 

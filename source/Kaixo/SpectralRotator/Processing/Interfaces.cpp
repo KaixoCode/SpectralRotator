@@ -21,7 +21,7 @@ namespace Kaixo::Processing {
             processor.inputFile.rotate(processor.rotatedFile, true);
             break;
         case 1:
-            processor.rotatedFile.rotate(processor.revertedFile, false, processor.inputFile.size());
+            processor.rotatedFile.rotate(processor.rotatedFile, false, processor.inputFile.file.buffer);
             break;
         }
     }
@@ -39,20 +39,45 @@ namespace Kaixo::Processing {
         }
     }
     
-    void FileInterface::trigger() {
+    void FileInterface::playPause() {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
         case 0:
-            processor.inputFile.trigger();
+            processor.inputFile.playPause();
             break;       
         case 1:
-            processor.rotatedFile.trigger();
+            processor.rotatedFile.playPause();
             break; 
-        case 2:
-            processor.revertedFile.trigger();
+        }
+    }
+
+    void FileInterface::seek(float position) {
+        auto& processor = self<SpectralRotatorProcessor>();
+
+        switch (settings.index) {
+        case 0:
+            processor.inputFile.seek(position);
+            break;
+        case 1:
+            processor.rotatedFile.seek(position);
             break;
         }
+    }
+    
+    float FileInterface::position() {
+        auto& processor = self<SpectralRotatorProcessor>();
+
+        switch (settings.index) {
+        case 0:
+            return processor.inputFile.position();
+            break;
+        case 1:
+            return processor.rotatedFile.position();
+            break;
+        }
+
+        return 0;
     }
 
     std::filesystem::path FileInterface::path() {
@@ -65,8 +90,20 @@ namespace Kaixo::Processing {
         case 1:
             return processor.rotatedFile.file.path;
             break;
-        case 2:
-            return processor.revertedFile.file.path;
+        }
+
+        return {};
+    }
+
+    const AudioBuffer& FileInterface::buffer() {
+        auto& processor = self<SpectralRotatorProcessor>();
+
+        switch (settings.index) {
+        case 0:
+            return processor.inputFile.file.buffer;
+            break;
+        case 1:
+            return processor.rotatedFile.file.buffer;
             break;
         }
 

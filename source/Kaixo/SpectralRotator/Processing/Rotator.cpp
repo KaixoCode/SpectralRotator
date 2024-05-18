@@ -6,6 +6,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/SpectralRotator/Processing/Rotator.hpp"
+#include "Kaixo/SpectralRotator/Processing/Resampler.hpp"
 
 // ------------------------------------------------
 
@@ -29,46 +30,6 @@ namespace Kaixo::Processing {
             r.resize(size);
         }
     };
-
-    // ------------------------------------------------
-
-    constexpr void fftImpl(std::vector<std::complex<float>>& x, bool inverse = false) {
-        std::vector<std::complex<float>> w(x.size(), 0.0f);
-
-        w[0] = 1.0f;
-        for (std::size_t pow2 = 1; pow2 < x.size(); pow2 *= 2) {
-            w[pow2] = std::polar(1.0f, 2 * std::numbers::pi_v<float> * pow2 / x.size() * (inverse ? 1 : -1));
-        }
-
-        for (std::size_t i = 3, last = 2; i < x.size(); i++) {
-            if (w[i] == 0.0f) {
-                w[i] = w[last] * w[i - last];
-            } else {
-                last = i;
-            }
-        }
-
-        std::vector<std::complex<float>> newX(x.size());
-        for (std::size_t blockSize = x.size(); blockSize > 1; blockSize /= 2) {
-            for (std::size_t start = 0; start < x.size(); start += blockSize) {
-                for (std::size_t i = 0; i < blockSize; i++) {
-                    newX[start + blockSize / 2 * (i % 2) + i / 2] = x[start + i];
-                }
-            }
-            x = newX;
-        }
-
-        for (std::size_t blockSize = 2; blockSize <= x.size(); blockSize *= 2) {
-            std::size_t wBaseI = x.size() / blockSize;
-            for (std::size_t start = 0; start < x.size(); start += blockSize) {
-                for (std::size_t i = 0; i < blockSize / 2; i++) {
-                    newX[start + i] = x[start + i] + w[wBaseI * i] * x[start + blockSize / 2 + i];
-                    newX[start + blockSize / 2 + i] = x[start + i] - w[wBaseI * i] * x[start + blockSize / 2 + i];
-                }
-            }
-            x = newX;
-        }
-    }
 
     constexpr void fft(ComplexBuffer& buffer) {
         fftImpl(buffer.l, false);
@@ -97,19 +58,32 @@ namespace Kaixo::Processing {
         ComplexBuffer sweep;
         sweep.resize(nextPower2); // Need power of 2 because FFT, will be zero padded
 
-        float phase = 0;
+        bool first = true;
+        float phase = 0.0f;
         const float percentOffset = 2.f * size / nextPower2;
         for (std::size_t i = 0; i < nextPower2 / 2; ++i) {
             const float progress = static_cast<float>(i) / nextPower2;
             const float deltaPhase = percentOffset * progress;
             const float sine = Math::nsin(phase);
-            const float cose = Math::ncos(phase);
+            const float cose = (first && phase < 0.25 ? sine : 1) * Math::ncos(phase);
 
             sweep.l[nextPower2 - i - 1] = { cose, sine };
             sweep.r[nextPower2 - i - 1] = { cose, sine };
 
-            phase = Math::Fast::fmod1(phase + deltaPhase);
+            if (phase + deltaPhase > 1) {
+                phase += deltaPhase - 1;
+                first = false;
+            } else {
+                phase += deltaPhase;
+            }
         }
+
+        const float sine = 0.5 * Math::nsin(phase);
+        const float cose = 0.5 * (first && phase < 0.25 ? sine : 1) * Math::ncos(phase);
+
+        sweep.l[nextPower2 / 2] = { cose, sine };
+        sweep.r[nextPower2 / 2] = { cose, sine };
+
 
         return sweep;
     }
@@ -194,7 +168,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
     
-    AudioBuffer Rotator::rotate(const AudioBuffer& buffer, bool direction, std::size_t originalSize) {
+    AudioBuffer Rotator::rotate(const AudioBuffer& buffer, bool direction, const AudioBuffer& originalBuffer) {
 
         // ------------------------------------------------
 
@@ -202,7 +176,8 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        const std::size_t bufferSize = originalSize == npos ? buffer.size() : originalSize;
+        bool usingOriginal = originalBuffer.size() != 0;
+        const std::size_t bufferSize = usingOriginal ? originalBuffer.size() : buffer.size();
         const std::size_t nextPower2 = std::bit_ceil(bufferSize * 2);
 
         // ------------------------------------------------
@@ -212,16 +187,37 @@ namespace Kaixo::Processing {
         ComplexBuffer result;
         result.resize(nextPower2); // Need power of 2 because FFT, will be zero-padded
 
-        std::size_t minSize = std::min(bufferSize, buffer.size());
         if (direction) { // Forward rotation = just copy buffer
-            for (std::size_t i = 0; i < minSize; ++i) {
-                result.l[i] = buffer[i].l;
-                result.r[i] = buffer[i].r;
+            if (usingOriginal && buffer.sampleRate != originalBuffer.sampleRate) {
+                AudioBufferResampler resampler;
+                resampler.samplerate.in = buffer.sampleRate;
+                resampler.samplerate.out = originalBuffer.sampleRate;
+                for (std::size_t i = 0; i < bufferSize; ++i) {
+                    auto out = resampler.generate(buffer);
+                    result.l[i] = out.l;
+                    result.r[i] = out.r;
+                }
+            } else {
+                for (std::size_t i = 0; i < bufferSize; ++i) {
+                    result.l[i] = buffer[i].l;
+                    result.r[i] = buffer[i].r;
+                }
             }
         } else { // Backward rotation = reverse the input buffer
-            for (std::size_t i = 0; i < minSize; ++i) {
-                result.l[i] = buffer[minSize - i - 1].l;
-                result.r[i] = buffer[minSize - i - 1].r;
+            if (usingOriginal && buffer.sampleRate != originalBuffer.sampleRate) {
+                AudioBufferResampler resampler;
+                resampler.samplerate.in = buffer.sampleRate;
+                resampler.samplerate.out = originalBuffer.sampleRate;
+                for (std::size_t i = 0; i < bufferSize; ++i) {
+                    auto out = resampler.generate(buffer);
+                    result.l[bufferSize - i - 1] = out.l;
+                    result.r[bufferSize - i - 1] = out.r;
+                }
+            } else {
+                for (std::size_t i = 0; i < bufferSize; ++i) {
+                    result.l[i] = buffer[bufferSize - i - 1].l;
+                    result.r[i] = buffer[bufferSize - i - 1].r;
+                }
             }
         }
 
@@ -257,10 +253,10 @@ namespace Kaixo::Processing {
         mirrored.resize(nextPower2);
         std::memcpy(mirrored.l.data(), result.l.data(), nextPower2 * sizeof(std::complex<float>));
         std::memcpy(mirrored.r.data(), result.r.data(), nextPower2 * sizeof(std::complex<float>));
-        mirror(mirrored); 
+        mirror(mirrored);
         // Since our buffer only contained negative frequencies after the convolution,
         // mirroring the frequencies here means our mirrored buffer now only contains positive frequencies.
-        
+
         // Now that we have both a buffer with positive frequences, and a buffer with negative frequencies
         // we need to copy over our mirrored buffer to the first half of the original buffer in the time-domain.
         ifft(mirrored); // Convert both buffers back to the time-domain
@@ -269,13 +265,20 @@ namespace Kaixo::Processing {
         std::memcpy(result.r.data(), mirrored.r.data(), bufferSize * sizeof(std::complex<float>));
         // After this copy, the first half of our result buffer now contains time-domain audio data with
         // only positive frequencies, and the second half only contains negative frequencies.
-        
+
         // Because the phase difference between positive and negative frequencies is exactly 180 degrees
         // there is now a sudden jump (a click) right where we merged the buffers, we can get rid of this jump
         // by inverting the phase of the first half of our buffer.
         for (std::size_t i = 0; i < bufferSize; ++i) {
             result.l[i] *= -1;
             result.r[i] *= -1;
+        }
+
+        // Everything that was generated in the zero-padding during our time in
+        // the frequency-domain can now be reset to 0, to prevent any potential artifacts.
+        for (std::size_t i = bufferSize * 2; i < nextPower2; ++i) {
+            result.l[i] = 0;
+            result.r[i] = 0;
         }
 
         // Now that our buffer contains exactly what we need, we can apply the ring modulation.
@@ -289,7 +292,7 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         // We're currently in the time-domain, so switch back to frequency-domain for the convolution
-        fft(result); 
+        fft(result);
         convolve(result, sineSweep);
         ifft(result);
         // Finally, after the 3 skews, our result buffer now contains time-domain audio data that 
@@ -300,9 +303,9 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         AudioBuffer output;
-        output.sampleRate = buffer.sampleRate;
+        output.sampleRate = usingOriginal ? originalBuffer.sampleRate : buffer.sampleRate;
         output.resize(bufferSize);
-        
+
         // The part of the buffer we need has shifted exactly the length of our original
         // input buffer, and has the exact same length as well, so we extract it by
         // taking all samples from indices 'bufferSize' to '2 * bufferSize'.
