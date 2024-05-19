@@ -102,6 +102,7 @@ namespace Kaixo::Processing {
             if (usingOriginal && buffer.sampleRate != originalBuffer.sampleRate) {
                 return resampler.generate(buffer);
             } else {
+                if (index >= buffer.size()) return Stereo{ 0, 0 };
                 auto i = reverseInput ? buffer.size() - index - 1 : index;
                 return Stereo{ buffer[i].l, buffer[i].r };
             }
