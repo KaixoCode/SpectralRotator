@@ -56,10 +56,10 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
         
     private:
-        SpectralViewer* spectralViewer;
+        SpectralViewer* m_SpectralViewer;
 
-        NonAudioLoadPopupView* nonAudioLoadPopupView;
-        NotificationPopupView* notificationPopupView;
+        NonAudioLoadPopupView* m_NonAudioLoadPopupView;
+        NotificationPopupView* m_NotificationPopupView;
 
         std::future<void> m_RotateFuture{};
         std::future<FileLoadStatus> m_FileLoadFuture{};

@@ -29,7 +29,7 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        spectralViewer = &add<SpectralViewer>({
+        m_SpectralViewer = &add<SpectralViewer>({
             4, 32, Width - 8, Height - 36
         }, {
             .file = settings.file
@@ -52,6 +52,7 @@ namespace Kaixo::Gui {
                 .callback = [&](bool) {
                     if (m_RotateFuture.valid()) return; // Can't rotate while waiting
                     m_RotateFuture = settings.file->rotate(Processing::Rotation::Rotate90);
+                    m_SpectralViewer->fileWillProbablyChangeSoon();
                 },
                 .graphics = T.rotate90
             });
@@ -62,6 +63,7 @@ namespace Kaixo::Gui {
                 .callback = [&](bool) {
                     if (m_RotateFuture.valid()) return; // Can't rotate while waiting
                     m_RotateFuture = settings.file->rotate(Processing::Rotation::Rotate270);
+                    m_SpectralViewer->fileWillProbablyChangeSoon();
                 },
                 .graphics = T.rotate270
             });
@@ -72,6 +74,7 @@ namespace Kaixo::Gui {
                 .callback = [&](bool) {
                     if (m_RotateFuture.valid()) return; // Can't rotate while waiting
                     m_RotateFuture = settings.file->rotate(Processing::Rotation::Flip);
+                    m_SpectralViewer->fileWillProbablyChangeSoon();
                 },
                 .graphics = T.flip
             });
@@ -82,6 +85,7 @@ namespace Kaixo::Gui {
                 .callback = [&](bool) {
                     if (m_RotateFuture.valid()) return; // Can't rotate while waiting
                     m_RotateFuture = settings.file->rotate(Processing::Rotation::Reverse);
+                    m_SpectralViewer->fileWillProbablyChangeSoon();
                 },
                 .graphics = T.reverse
             });
@@ -89,11 +93,11 @@ namespace Kaixo::Gui {
             
         // ------------------------------------------------
             
-        nonAudioLoadPopupView = &add<NonAudioLoadPopupView>({
+        m_NonAudioLoadPopupView = &add<NonAudioLoadPopupView>({
             4, 32, Width - 8, Height - 36 
         });
             
-        notificationPopupView = &add<NotificationPopupView>({
+        m_NotificationPopupView = &add<NotificationPopupView>({
             4, 32, Width - 8, Height - 36 
         });
 
@@ -117,9 +121,11 @@ namespace Kaixo::Gui {
             std::filesystem::path path = files[0].toStdString();
             if (path.extension() == ".mp3" || path.extension() == ".wav") {
                 m_FileLoadFuture = settings.file->openFile(path);
+                m_SpectralViewer->fileWillProbablyChangeSoon();
             } else {
-                nonAudioLoadPopupView->open([&, path](std::size_t bitDepth, double sampleRate) {
+                m_NonAudioLoadPopupView->open([&, path](std::size_t bitDepth, double sampleRate) {
                     m_FileLoadFuture = settings.file->openFile(path);
+                    m_SpectralViewer->fileWillProbablyChangeSoon();
                 });
             }
         }
@@ -131,7 +137,7 @@ namespace Kaixo::Gui {
         View::onIdle();
         if (m_RotateFuture.valid() && m_RotateFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
             m_RotateFuture = {};
-            spectralViewer->reGenerateImage(true);
+            m_SpectralViewer->reGenerateImage(true);
         }
 
         if (m_FileLoadFuture.valid() && m_FileLoadFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
@@ -155,12 +161,13 @@ namespace Kaixo::Gui {
             auto status = m_FileLoadFuture.get();
             m_FileLoadFuture = {};
             if (status == FileLoadStatus::Success) {
-                spectralViewer->reGenerateImage(true);
+                m_SpectralViewer->reGenerateImage(true);
                 if (settings.childView) {
-                    settings.childView->spectralViewer->reGenerateImage(true);
+                    settings.childView->m_SpectralViewer->reGenerateImage(true);
                 }
             } else {
-                notificationPopupView->open(errorMessage(status));
+                m_NotificationPopupView->open(errorMessage(status));
+                m_SpectralViewer->fileDidNotChange();
             }
         }
     }

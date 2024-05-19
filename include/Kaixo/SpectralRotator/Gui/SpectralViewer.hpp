@@ -64,6 +64,8 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
         
         void reGenerateImage(bool withAnalyze);
+        void fileWillProbablyChangeSoon() { m_FileWillProbablyChange = true; };
+        void fileDidNotChange() { m_FileWillProbablyChange = false; };
 
         // ------------------------------------------------
         
@@ -79,6 +81,7 @@ namespace Kaixo::Gui {
         std::atomic_bool m_NewImageReady = false;
         std::atomic_bool m_TryingToAssignNewImage = false;
         std::atomic_bool m_GeneratingImage = false;
+        std::atomic_bool m_FileWillProbablyChange = false;
         Processing::AudioBufferSpectralInformation m_AnalyzeResult;
         float m_PlayPosition = 0;
         Theme::Drawable m_Loading = T.loading;

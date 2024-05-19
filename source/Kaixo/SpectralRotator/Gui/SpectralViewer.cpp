@@ -70,7 +70,7 @@ namespace Kaixo::Gui {
         }
 
         m_ShowingProgress = false;
-        if (settings.file->modifyingFile() || m_GeneratingImage) {
+        if (settings.file->modifyingFile() || m_GeneratingImage || m_FileWillProbablyChange) {
             m_ShowingProgress = true;
             float fileLoadingProgress = settings.file->loadingProgress();
             float analyzingProgress = static_cast<float>(m_AnalyzingProgress) / m_AnalyzingProgressTotal;
@@ -158,6 +158,7 @@ namespace Kaixo::Gui {
                 }
             }
 
+            m_FileWillProbablyChange = false; // Regenerated, so doesn't matter anymore
             m_GeneratingImage = false;
             m_NewImageReady = true;
         });
