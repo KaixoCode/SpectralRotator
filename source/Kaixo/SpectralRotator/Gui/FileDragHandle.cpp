@@ -18,7 +18,7 @@ namespace Kaixo::Gui {
     // ------------------------------------------------
 
     void FileDragHandle::mouseDown(const juce::MouseEvent& event) {
-        settings.file->saveFile();
+        settings.file->saveFile(); // Starting drag operation, so we must have a file
         if (settings.file->path().empty()) return; // No file opened, can't drag
 
         StringArray files;

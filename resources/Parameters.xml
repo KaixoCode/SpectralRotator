@@ -2,12 +2,6 @@
 
   <!-- ================================================ -->
 
-  <param name="Progress"
-         default="0"
-         transform="Range[0.f, 100.f]"
-         format="Percent"
-         interface="$self.progress = $value"/>
-
   <!-- ================================================ -->
 
 </module>

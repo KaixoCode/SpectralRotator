@@ -14,7 +14,6 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     SpectralRotatorProcessor::SpectralRotatorProcessor() {
-        registerModule(parameters);
         registerModule(inputFile);
         registerModule(rotatedFile);
 
@@ -25,29 +24,11 @@ namespace Kaixo::Processing {
 
     void SpectralRotatorProcessor::process() {
         for (std::size_t i = 0; i < outputBuffer().size(); ++i) {
-            parameters.process();
-
             inputFile.process();
             rotatedFile.process();
 
-            Stereo input = inputBuffer()[i];
-            input += inputFile.output + rotatedFile.output;
-
-            outputBuffer()[i] = input;
+            outputBuffer()[i] = inputFile.output + rotatedFile.output;
         }
-    }
-
-    // ------------------------------------------------
-
-    void SpectralRotatorProcessor::init() {
-    }
-
-    basic_json SpectralRotatorProcessor::serialize() {
-        basic_json json;
-        return json;
-    }
-
-    void SpectralRotatorProcessor::deserialize(basic_json& data) {
     }
 
     // ------------------------------------------------

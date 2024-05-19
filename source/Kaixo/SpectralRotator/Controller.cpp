@@ -15,28 +15,11 @@ namespace Kaixo {
 
     // ------------------------------------------------
 
-    void ControllerData::init() {
-    }
-
-    basic_json ControllerData::serialize() {
-        basic_json json{};
-        return json;
-    }
-
-    void ControllerData::deserialize(basic_json& data) {
-    }
-
-    // ------------------------------------------------
-
     SpectralRotatorController::SpectralRotatorController() {
 
         // ------------------------------------------------
 
         Gui::T.initialize();
-
-        // ------------------------------------------------
-
-        data<ControllerData>();
 
         // ------------------------------------------------
 

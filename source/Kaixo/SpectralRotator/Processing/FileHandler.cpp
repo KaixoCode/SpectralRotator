@@ -41,8 +41,7 @@ namespace Kaixo::Processing {
     void FileHandler::playPause() {
         if (playing) {
             playing = false;
-        }
-        else {
+        } else {
             if (resampler.eof()) {
                 resampler.index(0);
             }

@@ -40,7 +40,7 @@ namespace Kaixo::Processing {
 
 		// ------------------------------------------------
 
-		std::size_t* stepRef = nullptr;
+		std::size_t* stepRef = nullptr; // For progress bar
 
 		// ------------------------------------------------
 

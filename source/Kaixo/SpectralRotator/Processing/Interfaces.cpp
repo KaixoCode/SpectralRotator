@@ -82,12 +82,8 @@ namespace Kaixo::Processing {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            processor.inputFile.playPause();
-            break;       
-        case 1:
-            processor.rotatedFile.playPause();
-            break; 
+        case 0: processor.inputFile.playPause(); break;       
+        case 1: processor.rotatedFile.playPause(); break; 
         }
     }
 
@@ -95,12 +91,8 @@ namespace Kaixo::Processing {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            processor.inputFile.seek(position);
-            break;
-        case 1:
-            processor.rotatedFile.seek(position);
-            break;
+        case 0: processor.inputFile.seek(position); break;
+        case 1: processor.rotatedFile.seek(position); break;
         }
     }
     

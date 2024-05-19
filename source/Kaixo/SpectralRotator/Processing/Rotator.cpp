@@ -112,17 +112,17 @@ namespace Kaixo::Processing {
             result.l[index] = out.l;
             result.r[index] = out.r;
 
-            if (usingOriginal) {
-                auto power = Math::Fast::abs(Stereo{ originalBuffer[i].l, originalBuffer[i].r });
-                sumInput += power * power;
-            } else {
-                auto power = Math::Fast::abs(out);
-                sumInput += power * power;
-            }
-
             if (i != 0) {
                 result.l[resultSize - index] = out.l;
                 result.r[resultSize - index] = out.r;
+            }
+            
+            if (usingOriginal) { // When using original we want to maintain power of the original buffer
+                auto level = Math::Fast::abs(Stereo{ originalBuffer[i].l, originalBuffer[i].r });
+                sumInput += level * level;
+            } else {
+                auto level = Math::Fast::abs(out);
+                sumInput += level * level;
             }
 
             step();
@@ -161,8 +161,9 @@ namespace Kaixo::Processing {
                 result.r[i].real(),
             };
 
-            auto power = Math::Fast::abs(Stereo{ output[index].l, output[index].r });
-            sumOutput += power * power;
+            auto level = Math::Fast::abs(Stereo{ output[index].l, output[index].r });
+            sumOutput += level * level;
+
             step();
         }
 

@@ -56,7 +56,7 @@ namespace Kaixo::Processing {
         auto get = [&](std::size_t index) -> AudioFrame {
             if (index < buffer.size()) return buffer[index];
             return { 0, 0 };
-            };
+        };
 
         std::vector<std::complex<float>> fftBuffer(fftSize);
 

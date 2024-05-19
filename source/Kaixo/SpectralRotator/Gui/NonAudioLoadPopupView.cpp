@@ -41,8 +41,8 @@ namespace Kaixo::Gui {
             .callback = [this](bool) {
                 constexpr float bitDepths[]{ 8, 16, 32, 64 };
                 constexpr float sampleRates[]{ 8000, 11025, 16000, 22050, 44100, 48000 };
-                std::size_t bd = Math::clamp(bitDepth->transformedValue(), 0, 3);
-                std::size_t sr = Math::clamp(sampleRate->transformedValue(), 0, 5);
+                std::size_t bd = Math::clamp(m_BitDepth->transformedValue(), 0, 3);
+                std::size_t sr = Math::clamp(m_SampleRate->transformedValue(), 0, 5);
 
                 if (m_Callback) m_Callback(bitDepths[bd], sampleRates[sr]);
                 if (--m_Requests == 0) setVisible(false);
@@ -51,7 +51,7 @@ namespace Kaixo::Gui {
             .text = "Import"
         });
 
-        bitDepth = &add<Knob>({ 4, 28, Width - 8, 20 }, {
+        m_BitDepth = &add<Knob>({ 4, 28, Width - 8, 20 }, {
             .graphics = T.popup.option,
             .tooltipName = false,
             .tooltipValue = false,
@@ -62,7 +62,7 @@ namespace Kaixo::Gui {
             .resetValue = 0.33,
         });
             
-        sampleRate = &add<Knob>({ 4, 50, Width - 8, 20 }, {
+        m_SampleRate = &add<Knob>({ 4, 50, Width - 8, 20 }, {
             .graphics = T.popup.option,
             .tooltipName = false,
             .tooltipValue = false,

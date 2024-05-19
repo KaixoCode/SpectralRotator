@@ -31,8 +31,8 @@ namespace Kaixo::Gui {
     private:
         std::function<void(std::size_t, double)> m_Callback;
         std::size_t m_Requests = 0;
-        Knob* bitDepth;
-        Knob* sampleRate;
+        Knob* m_BitDepth;
+        Knob* m_SampleRate;
 
         // ------------------------------------------------
 

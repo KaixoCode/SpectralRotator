@@ -52,11 +52,6 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        constexpr static std::size_t InitialCopyWeight = 1;
-        constexpr static std::size_t FinalCopyWeight = 1;
-
-        // ------------------------------------------------
-
         AudioBuffer rotateOnce(const AudioBuffer& buffer, Rotation direction, const AudioBuffer& originalBuffer = {});
 
         // ------------------------------------------------

@@ -23,10 +23,6 @@ namespace Kaixo::Processing {
     public:
 
         // ------------------------------------------------
-        
-        float progress;
-
-        // ------------------------------------------------
 
         SpectralRotatorProcessor();
 
@@ -36,18 +32,8 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        ParameterDatabase<SpectralRotatorProcessor> parameters{ this };
-
-        // ------------------------------------------------
-
         FileHandler inputFile; // Input audio
         FileHandler rotatedFile; // Rotated audio
-
-        // ------------------------------------------------
-
-        void init() override;
-        basic_json serialize() override;
-        void deserialize(basic_json& data) override;
 
         // ------------------------------------------------
 
