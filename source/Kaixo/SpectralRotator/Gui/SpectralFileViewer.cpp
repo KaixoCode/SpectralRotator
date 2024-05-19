@@ -124,7 +124,7 @@ namespace Kaixo::Gui {
                 m_SpectralViewer->fileWillProbablyChangeSoon();
             } else {
                 m_NonAudioLoadPopupView->open([&, path](std::size_t bitDepth, double sampleRate) {
-                    m_FileLoadFuture = settings.file->openFile(path);
+                    m_FileLoadFuture = settings.file->openFile(path, bitDepth, sampleRate);
                     m_SpectralViewer->fileWillProbablyChangeSoon();
                 });
             }
