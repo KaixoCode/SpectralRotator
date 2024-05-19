@@ -14,6 +14,8 @@ namespace Kaixo::Gui {
     {
         setWantsKeyboardFocus(true);
         wantsIdle(true);
+
+        reGenerateImage(true);
     }
 
     SpectralViewer::~SpectralViewer() {
