@@ -22,7 +22,7 @@ namespace Kaixo::Processing {
 		// ------------------------------------------------
 		
 		const auto get = [&](std::int64_t index) -> AudioFrame {
-			if (index >= 0 && index < in.size()) return in[index];
+			if (index >= 0 && index < in.size()) return reverse ? in[in.size() - index - 1] : in[index];
 			finished = true;
 			return {};
 		};

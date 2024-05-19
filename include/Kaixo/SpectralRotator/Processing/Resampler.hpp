@@ -27,6 +27,10 @@ namespace Kaixo::Processing {
 		void index(std::int64_t i) { playindex = i; lastinserted = i; finished = false; }
 
 		// ------------------------------------------------
+		
+		bool reverse = false;
+
+		// ------------------------------------------------
 
 		struct {
 			double in;

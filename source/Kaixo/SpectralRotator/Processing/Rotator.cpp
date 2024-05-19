@@ -47,11 +47,11 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            m_EstimatedSteps = bufferSize * 3 + resultSize;
+            m_EstimatedSteps = buffer.size() * 5 - 1;
 
             // ------------------------------------------------
 
-            return rotateOnce(buffer, direction, originalBuffer);
+            return rotateOnce(buffer, direction);
 
             // ------------------------------------------------
 
@@ -80,7 +80,7 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        bool usingOriginal = false; // originalBuffer.size() != 0;
+        bool usingOriginal = originalBuffer.size() != 0;
         const std::size_t bufferSize = (usingOriginal ? originalBuffer.size() : buffer.size());
         const std::size_t resultSize = 2 * bufferSize - 1;
 
@@ -97,28 +97,30 @@ namespace Kaixo::Processing {
         AudioBufferResampler resampler{};
         resampler.samplerate.in = buffer.sampleRate;
         resampler.samplerate.out = originalBuffer.sampleRate;
+        resampler.reverse = reverseInput;
         auto get = [&](std::size_t index) {
             if (usingOriginal && buffer.sampleRate != originalBuffer.sampleRate) {
                 return resampler.generate(buffer);
             } else {
-                return Stereo{ buffer[index].l, buffer[index].r };
+                auto i = reverseInput ? buffer.size() - index - 1 : index;
+                return Stereo{ buffer[i].l, buffer[i].r };
             }
         };
 
         Stereo sumInput{};
         for (std::size_t i = 0; i < bufferSize; ++i) {
-            auto index = reverseInput ? bufferSize - i - 1 : i;
             auto out = get(i);
-            result.l[index] = out.l;
-            result.r[index] = out.r;
+            result.l[i] = out.l;
+            result.r[i] = out.r;
 
             if (i != 0) {
-                result.l[resultSize - index] = out.l;
-                result.r[resultSize - index] = out.r;
+                result.l[resultSize - i] = out.l;
+                result.r[resultSize - i] = out.r;
             }
             
             if (usingOriginal) { // When using original we want to maintain power of the original buffer
-                auto level = Math::Fast::abs(Stereo{ originalBuffer[i].l, originalBuffer[i].r });
+                auto index = reverseInput ? bufferSize - i - 1 : i;
+                auto level = Math::Fast::abs(Stereo{ originalBuffer[index].l, originalBuffer[index].r });
                 sumInput += level * level;
             } else {
                 auto level = Math::Fast::abs(out);
