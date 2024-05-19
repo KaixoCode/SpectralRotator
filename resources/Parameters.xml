@@ -1,7 +1,1 @@
-<module name="Synth" var-name="Synth" interface="normal">
-
-  <!-- ================================================ -->
-
-  <!-- ================================================ -->
-
-</module>
+<module name="Synth" var-name="Synth" interface="normal"></module>
