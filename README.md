@@ -21,5 +21,7 @@ Any samples you've dragged out of this plugin are stored in a folder somewhere i
 
 ![settings](https://assets.kaixo.me/SpectralRotator/settings-ui.png)
 
+**An important note** when dropping modified rotated samples back into SpectralRotator is that you align the bottom of your spectrum properly. For example, when you have rotated your spectrum such that the lower frequencies are on the left, you must make sure when you import your edited sample, that the start of your sample is aligned (If it was rotated such that the lower frequencies are on the right, you would have to align the end of your sample). Otherwise a small frequency shift will occur, depending on how many audio samples of delay there are. You do not have to worry about making sure the sample is exactly the same length though, as it will take this information from the *source* sampler. 
+
 ## Questions
 If you have any questions or suggestions about this plugin you can contact me on Discord `@kaixo`.
