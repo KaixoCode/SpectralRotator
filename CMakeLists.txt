@@ -12,7 +12,7 @@ set(COMPANY_CODE "Kaix")
 set(WEBSITE "https://kaixo.me")
 set(BUNDLE_IDENTIFIER "me.kaixo.spectralrotator")
 set(VERSION_TYPE "SNAPSHOT")
-set(VERSION "1.0.2")
+set(VERSION "1.0.3")
 set(INITIAL_SIZE "500, 500")
 set(IS_SYNTH true)
 
