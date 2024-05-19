@@ -12,41 +12,41 @@
 
 namespace Kaixo {
 
-	// ------------------------------------------------
+    // ------------------------------------------------
 
-	enum class FileLoadStatus {
-		Success, TooLarge, Error, FailedToOpen, NotExists
-	};
+    enum class FileLoadStatus {
+        Success, TooLarge, Error, FailedToOpen, NotExists
+    };
 
-	// ------------------------------------------------
+    // ------------------------------------------------
 
-	struct AudioFile {
+    struct AudioFile {
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-		FileLoadStatus open(std::filesystem::path file, std::size_t bitDepth = 16, double sampleRate = 48000);
+        FileLoadStatus open(std::filesystem::path file, std::size_t bitDepth = 16, double sampleRate = 48000);
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-		std::filesystem::path path{};
-		Processing::AudioBuffer buffer{};
-		std::atomic_bool changed{};
+        std::filesystem::path path{};
+        Processing::AudioBuffer buffer{};
+        std::atomic_bool changed{};
 
-		// ------------------------------------------------
-		
-		void write(std::filesystem::path file);
+        // ------------------------------------------------
+        
+        void write(std::filesystem::path file);
 
-		void save(std::string filename = "rotated");
+        void save(std::string filename = "rotated");
 
-		// ------------------------------------------------
-		
-		static std::filesystem::path generationLocation();
+        // ------------------------------------------------
+        
+        static std::filesystem::path generationLocation();
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-	};
+    };
 
-	// ------------------------------------------------
+    // ------------------------------------------------
 
 }
 

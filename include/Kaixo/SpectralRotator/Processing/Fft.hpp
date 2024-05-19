@@ -34,39 +34,39 @@
 
 namespace Kaixo::Processing {
 
-	// ------------------------------------------------
+    // ------------------------------------------------
 
-	struct Fft {
+    struct Fft {
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-		std::size_t* stepRef = nullptr; // For progress bar
+        std::size_t* stepRef = nullptr; // For progress bar
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-		void transform(std::vector<std::complex<float>>& vec, bool inverse);
-		void transformRadix2(std::vector<std::complex<float>>& vec, bool inverse);
-		void transformBluestein(std::vector<std::complex<float>>& vec, bool inverse);
+        void transform(std::vector<std::complex<float>>& vec, bool inverse);
+        void transformRadix2(std::vector<std::complex<float>>& vec, bool inverse);
+        void transformBluestein(std::vector<std::complex<float>>& vec, bool inverse);
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-		std::vector<std::complex<float>> convolve(
-			std::vector<std::complex<float>> xvec,
-			std::vector<std::complex<float>> yvec);
+        std::vector<std::complex<float>> convolve(
+            std::vector<std::complex<float>> xvec,
+            std::vector<std::complex<float>> yvec);
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-		std::size_t estimateSteps(std::size_t size, bool inverse);
+        std::size_t estimateSteps(std::size_t size, bool inverse);
 
-		// ------------------------------------------------
-		
-		void step() { if (stepRef) (*stepRef)++; }
+        // ------------------------------------------------
+        
+        void step() { if (stepRef) (*stepRef)++; }
 
-		// ------------------------------------------------
+        // ------------------------------------------------
 
-	};
+    };
 
-	// ------------------------------------------------
+    // ------------------------------------------------
 
 }
 
