@@ -18,17 +18,28 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    class MainView : public View {
+    class FileDragHandle : public View {
     public:
 
         // ------------------------------------------------
 
-        MainView(Context c);
+        struct Settings {
+
+            // ------------------------------------------------
+
+            Processing::InterfaceStorage<Processing::FileInterface> file;
+
+            // ------------------------------------------------
+
+        } settings;
 
         // ------------------------------------------------
 
-        Processing::InterfaceStorage<Processing::FileInterface> inputFileInterface;
-        Processing::InterfaceStorage<Processing::FileInterface> rotatedFileInterface;
+        FileDragHandle(Context c, Settings s);
+
+        // ------------------------------------------------
+
+        void mouseDown(const juce::MouseEvent& event) override;
 
         // ------------------------------------------------
 

@@ -7,28 +7,32 @@
 
 #include "Kaixo/Core/Definitions.hpp"
 #include "Kaixo/Core/Gui/View.hpp"
-
-// ------------------------------------------------
-
-#include "Kaixo/SpectralRotator/Processing/Interfaces.hpp"
+#include "Kaixo/Core/Gui/Knob.hpp"
 
 // ------------------------------------------------
 
 namespace Kaixo::Gui {
 
     // ------------------------------------------------
-
-    class MainView : public View {
+    
+    class NonAudioLoadPopupView : public View {
     public:
 
         // ------------------------------------------------
 
-        MainView(Context c);
+        NonAudioLoadPopupView(Context c);
 
         // ------------------------------------------------
 
-        Processing::InterfaceStorage<Processing::FileInterface> inputFileInterface;
-        Processing::InterfaceStorage<Processing::FileInterface> rotatedFileInterface;
+        void open(std::function<void(std::size_t, double)> c);
+
+        // ------------------------------------------------
+
+    private:
+        std::function<void(std::size_t, double)> m_Callback;
+        std::size_t m_Requests = 0;
+        Knob* bitDepth;
+        Knob* sampleRate;
 
         // ------------------------------------------------
 

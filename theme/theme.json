@@ -26,7 +26,7 @@
   background: {
     image: {
       source: background.png
-      edges: [4, 28, 261, 8]
+      edges: [28, 261, 4, 4]
     }
   }
 
@@ -41,19 +41,222 @@
   }
 
   spectrum: {
-    color1: [0, 0, 0]
+    color1: [27, 27, 27]
     color2: [60, 60, 179]
     color3: [239, 15, 0]
     color4: [255, 255, 64]
     color5: [255, 255, 255]
   }
 
-  rotator: {
+  source-background: {
+    image: {
+      source: source-background.png
+      edges: [104, 32, 4, 4]
+    }
+  }
+
+  rotate-background: {
+      image: {
+        source: rotate-background.png
+        edges: [104, 32, 4, 4]
+      }
+  }
+
+  settings: {
+    button: {
+      background-color: {
+        color: [255, 255, 255, 0]
+        hovering: [255, 255, 255, 20]
+      }
+      
+      image: {
+        source: settings.png
+        align: center
+      }
+    }
+
+
     background: {
       image: {
-        source: rotator-background.png
-        edges: [104, 28, 4, 4]
+        source: settings-background.png
+        edges: [132, 28, 4, 4]
       }
+    }
+
+    entry: {
+      background-color: {
+        color: [255, 255, 255, 0]
+        transition: 50
+        hovering: [255, 255, 255, 20]
+      }
+
+      layers: {
+        setting: {
+          text: {
+            content: $setting-name
+            position: [4, 4]
+            align: top-left
+            font: $main-font
+            color: [211, 211, 211]
+          }
+        }
+
+        value: {
+          text: {
+            content: $setting-value
+            position: [100, 4]
+            align: top-left
+            font: $main-font
+            color: [211, 211, 211]
+            overflow: dots
+          }
+        }
+      }
+    }
+  }
+
+  popup: {
+    background: {
+      background-color: [27, 27, 27]
+
+      text: {
+        color: [211, 211, 211]
+        font: $main-font
+        align: top-left
+        content: $text
+        position: [4, 4]
+      }
+    }
+
+    confirm: {
+      background-color: {
+        color: [255, 255, 255, 0]
+        hovering: [255, 255, 255, 20]
+      }
+
+      text: {
+        color: [211, 211, 211]
+        font: $main-font
+        align: center
+        content: $text
+      }
+    }
+
+    message: {
+      font: $main-font
+      text-color: [211, 211, 211]
+      caret-color: [211, 211, 211]
+      selection-color: [211, 211, 211, 30]
+      placeholder-color: {
+        value: [211, 211, 211]
+        focused: [0, 0, 0, 0]
+      }
+
+      background: {
+        color: [255, 255, 255, 0]
+        hovering: [255, 255, 255, 20]
+      }
+    }
+
+    cancel: {
+      background-color: {
+        color: [255, 255, 255, 0]
+        hovering: [255, 255, 255, 20]
+      }
+
+      text: {
+        color: [211, 211, 211]
+        font: $main-font
+        align: center
+        content: $text
+      }
+    }
+
+    option: {
+      background-color: {
+        color: [255, 255, 255, 0]
+        hovering: [255, 255, 255, 20]
+      }
+
+      layers: {
+        value: {
+          text: {
+            color: [211, 211, 211]
+            font: $main-font
+            content: $value
+            align: top-left
+            position: [90, 4]
+          }
+        }
+
+        name: {
+          text: {
+            color: [211, 211, 211]
+            font: $main-font
+            content: $name
+            align: top-left
+            position: [4, 4]
+          }
+        }
+      }
+    }
+  }
+
+  loading: {
+    background-color: [27, 27, 27]
+    text: {
+      content: Loading... $progress
+      align: center
+      font: $main-font
+      color: [211, 211, 211]
+    }
+  }
+
+  rotate-90: {
+    background-color: {
+      color: [255, 255, 255, 0]
+      hovering: [255, 255, 255, 20]
+    }
+
+    image: {
+      source: rotate-90.png
+      align: center
+    }
+  }
+
+  flip: {
+    background-color: {
+      color: [255, 255, 255, 0]
+      hovering: [255, 255, 255, 20]
+    }
+    
+    image: {
+      source: flip.png
+      align: center
+    }
+  }
+
+  rotate-270: {
+    background-color: {
+      color: [255, 255, 255, 0]
+      hovering: [255, 255, 255, 20]
+    }
+    
+    image: {
+      source: rotate-270.png
+      align: center
+    }
+  }
+
+  reverse: {
+    background-color: {
+      color: [255, 255, 255, 0]
+      hovering: [255, 255, 255, 20]
+    }
+    
+    image: {
+      source: reverse.png
+      align: center
     }
   }
 

@@ -11,7 +11,27 @@
     "color5": "color"
   },
 
-  "rotator": {
-    "background": "drawable"
-  }
+  "source-background": "drawable",
+  "rotate-background": "drawable",
+
+  "settings": {
+    "button": "drawable",
+    "background": "drawable",
+    "entry": "drawable"
+  },
+
+  "popup": {
+    "background": "drawable",
+    "option": "drawable",
+    "confirm": "drawable",
+    "cancel": "drawable",
+    "message": "text-area"
+  },
+
+  "rotate-90": "drawable",
+  "rotate-270": "drawable",
+  "flip": "drawable",
+  "reverse": "drawable",
+
+  "loading": "drawable"
 }

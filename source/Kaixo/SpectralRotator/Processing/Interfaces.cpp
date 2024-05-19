@@ -13,30 +13,69 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void FileInterface::rotate() {
+    void FileInterface::saveFile() {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            processor.inputFile.rotate(processor.rotatedFile, true);
-            break;
         case 1:
-            processor.rotatedFile.rotate(processor.rotatedFile, false, processor.inputFile.file.buffer);
+            processor.rotatedFile.file.save(processor.inputFile.file.path.stem().string());
             break;
         }
     }
     
-    void FileInterface::openFile(std::filesystem::path path) {
+    std::future<void> FileInterface::rotate(Rotation direction) {
+        return asyncTaskPool.push([&, direction, index = settings.index]() {
+            auto& processor = self<SpectralRotatorProcessor>();
+
+            switch (index) {
+            case 0:
+                processor.inputFile.rotate(processor.rotatedFile, direction);
+                break;
+            case 1:
+                processor.rotatedFile.rotate(processor.rotatedFile, direction, processor.inputFile.file.buffer);
+                break;
+            }
+        });
+    }
+    
+    std::future<FileLoadStatus> FileInterface::openFile(std::filesystem::path path, std::size_t bitDepth, double sampleRate) {
+        return asyncTaskPool.push([&, path, bitDepth, sampleRate, index = settings.index]() {
+            auto& processor = self<SpectralRotatorProcessor>();
+
+            switch (index) {
+            case 0: {
+                auto status = processor.inputFile.open(path, bitDepth, sampleRate);
+                processor.rotatedFile.open(path, bitDepth, sampleRate);
+                return status;
+            }
+            case 1:
+                return processor.rotatedFile.open(path, bitDepth, sampleRate);
+            }
+
+            return FileLoadStatus::NotExists;
+        });
+    }
+    
+    bool FileInterface::modifyingFile() {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            processor.inputFile.open(path);
-            break;        
-        case 1:
-            processor.rotatedFile.open(path);
-            break;
+        case 0: return processor.inputFile.modifyingFile;
+        case 1: return processor.rotatedFile.modifyingFile;
         }
+
+        return false;
+    }
+    
+    float FileInterface::loadingProgress() {
+        auto& processor = self<SpectralRotatorProcessor>();
+
+        switch (settings.index) {
+        case 0: return processor.inputFile.loadingProgress();
+        case 1: return processor.rotatedFile.loadingProgress();
+        }
+
+        return 1;
     }
     
     void FileInterface::playPause() {
@@ -69,12 +108,8 @@ namespace Kaixo::Processing {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            return processor.inputFile.position();
-            break;
-        case 1:
-            return processor.rotatedFile.position();
-            break;
+        case 0: return processor.inputFile.position();
+        case 1: return processor.rotatedFile.position();
         }
 
         return 0;
@@ -84,27 +119,27 @@ namespace Kaixo::Processing {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            return processor.inputFile.file.path;
-            break;
-        case 1:
-            return processor.rotatedFile.file.path;
-            break;
+        case 0: return processor.inputFile.file.path;
+        case 1: return processor.rotatedFile.file.path;
         }
 
         return {};
     }
 
-    const AudioBuffer& FileInterface::buffer() {
+    AudioBufferSpectralInformation FileInterface::analyzeBuffer(std::size_t fftSize, std::size_t horizontalResolution) {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0:
-            return processor.inputFile.file.buffer;
+        case 0: {
+            std::lock_guard lock{ processor.inputFile.fileMutex };
+            return AudioBufferSpectralInformation::analyze(processor.inputFile.file.buffer, fftSize, horizontalResolution);
             break;
-        case 1:
-            return processor.rotatedFile.file.buffer;
+        }
+        case 1: {
+            std::lock_guard lock{ processor.rotatedFile.fileMutex };
+            return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file.buffer, fftSize, horizontalResolution);
             break;
+        }
         }
 
         return {};

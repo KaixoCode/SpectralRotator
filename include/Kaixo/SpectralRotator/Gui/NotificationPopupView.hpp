@@ -7,33 +7,35 @@
 
 #include "Kaixo/Core/Definitions.hpp"
 #include "Kaixo/Core/Gui/View.hpp"
-
-// ------------------------------------------------
-
-#include "Kaixo/SpectralRotator/Processing/Interfaces.hpp"
+#include "Kaixo/Core/Gui/Views/TextView.hpp"
 
 // ------------------------------------------------
 
 namespace Kaixo::Gui {
 
     // ------------------------------------------------
-
-    class MainView : public View {
+    
+    class NotificationPopupView : public View {
     public:
 
         // ------------------------------------------------
 
-        MainView(Context c);
+        NotificationPopupView(Context c);
 
         // ------------------------------------------------
 
-        Processing::InterfaceStorage<Processing::FileInterface> inputFileInterface;
-        Processing::InterfaceStorage<Processing::FileInterface> rotatedFileInterface;
+        void open(std::string_view text);
+
+        // ------------------------------------------------
+
+    private:
+        std::size_t m_Requests = 0;
+        TextView* m_Message;
 
         // ------------------------------------------------
 
     };
-
+    
     // ------------------------------------------------
 
 }

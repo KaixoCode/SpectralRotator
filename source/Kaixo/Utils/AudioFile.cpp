@@ -13,9 +13,12 @@ namespace Kaixo {
 
 	// ------------------------------------------------
 
-	bool AudioFile::open(std::filesystem::path f) {
-		auto res = decode(buffer, f);
-		if (res) path = f;
+	FileLoadStatus AudioFile::open(std::filesystem::path f, std::size_t bitDepth, double sampleRate) {
+		auto res = decode(buffer, f, 48000 * 32, bitDepth, sampleRate);
+		if (res == FileLoadStatus::Success) {
+			changed = false;
+			path = f;
+		}
 		return res;
 	}
 
@@ -26,18 +29,32 @@ namespace Kaixo {
 	}
 	
 	void AudioFile::save(std::string filename) {
-		auto now = std::chrono::system_clock::now();
-		auto in_time_t = std::chrono::system_clock::to_time_t(now);
-		std::stringstream datetime{};
-		datetime << std::put_time(std::localtime(&in_time_t), "%Y%m%d-%H%M%S");
+		if (path.empty()) { // Not previously saved, generate location
+			auto now = std::chrono::system_clock::now();
+			auto in_time_t = std::chrono::system_clock::to_time_t(now);
+			std::stringstream datetime{};
+			datetime << std::put_time(std::localtime(&in_time_t), "%Y%m%d-%H%M%S");
 
-		auto name = filename + "-rotated-" + datetime.str() + ".wav";
+			auto name = filename + "-rotated-" + datetime.str() + ".wav";
 
-		path = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName().toStdString();
-		std::filesystem::create_directories(path / "SpectralRotator" / "generated");
-		path = path / "SpectralRotator" / "generated" / name;
+			path = generationLocation() / name;
+			write(path);
+		} else if (changed) {
+			write(path);
+		}
 
-		write(path);
+		changed = false;
+	}
+
+	// ------------------------------------------------
+
+	std::filesystem::path AudioFile::generationLocation() {
+		std::filesystem::path path = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName().toStdString();
+		path = path / "SpectralRotator" / "generated";
+		if (!std::filesystem::exists(path)) {
+			std::filesystem::create_directories(path);
+		}
+		return path;
 	}
 
 	// ------------------------------------------------

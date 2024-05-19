@@ -10,7 +10,9 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/Utils/AudioFile.hpp"
 #include "Kaixo/SpectralRotator/Processing/AudioBuffer.hpp"
+#include "Kaixo/SpectralRotator/Processing/AudioBufferSpectralInformation.hpp"
 
 // ------------------------------------------------
 
@@ -29,15 +31,22 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        void rotate();
-        void openFile(std::filesystem::path path);
+        void saveFile();
+        std::future<void> rotate(Rotation direction);
+        std::future<FileLoadStatus> openFile(std::filesystem::path path, std::size_t bitDepth = 16, double sampleRate = 48000);
+        bool modifyingFile();
+        float loadingProgress();
 
         void playPause();
         void seek(float position);
         float position();
 
         std::filesystem::path path();
-        const AudioBuffer& buffer();
+        AudioBufferSpectralInformation analyzeBuffer(std::size_t fftSize, std::size_t horizontalResolution);
+
+        // ------------------------------------------------
+        
+        cxxpool::thread_pool asyncTaskPool{ 1 };
 
         // ------------------------------------------------
 
