@@ -20,7 +20,7 @@ namespace Kaixo::Processing {
     float AudioBufferSpectralInformation::get(std::size_t x, std::size_t y) {
         std::size_t index = x * frameSize + y;
         if (index < intensity.size()) return intensity[index];
-        else return 0;
+        else return -145;
     }
 
     // ------------------------------------------------
@@ -53,7 +53,7 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     float AudioBufferSpectralInformation::intensityAt(float x, float dx, float y, float dy) {
-        if (intensity.size() == 0) return 0;
+        if (intensity.size() == 0) return -145;
 
         float xval = x * (frames() - 2);
         if (dx < 1) {
