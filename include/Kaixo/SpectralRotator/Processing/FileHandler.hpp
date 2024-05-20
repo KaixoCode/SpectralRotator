@@ -36,18 +36,32 @@ namespace Kaixo::Processing {
 
         void waitForReadingToFinish();
         FileLoadStatus open(std::filesystem::path path, std::size_t bitDepth = 16, double sampleRate = 48000);
-        void rotate(FileHandler& destination, Rotation direction, const AudioBuffer& originalBuffer = {});
-        void writeBuffer(AudioBuffer&& other, bool lock = true);
+        void rotate(Rotation direction, const AudioBuffer& originalBuffer = {});
 
         float loadingProgress();
 
         // ------------------------------------------------
 
-        std::size_t size() const { return file.buffer.size(); }
+        std::size_t size();
 
         // ------------------------------------------------
 
-        AudioFile file{};
+        constexpr static int d000f = 0;
+        constexpr static int d090f = 1;
+        constexpr static int d180f = 2;
+        constexpr static int d270f = 3;
+        constexpr static int d000r = 4;
+        constexpr static int d090r = 5;
+        constexpr static int d180r = 6;
+        constexpr static int d270r = 7;
+
+        std::atomic_int currentRotation = d000f;
+        std::map<int, AudioFile> rotations;
+
+        AudioFile* file();
+
+        int nextRotation(Rotation direction);
+        std::pair<int, Rotation> getMostEfficientRotationTo(Rotation direction);
 
         // ------------------------------------------------
 

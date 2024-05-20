@@ -18,7 +18,8 @@ namespace Kaixo::Processing {
 
         switch (settings.index) {
         case 1:
-            processor.rotatedFile.file.save(processor.inputFile.file.path.stem().string());
+            if (processor.rotatedFile.file() == nullptr) return;
+            processor.rotatedFile.file()->save(processor.inputFile.file()->path.stem().string());
             break;
         }
     }
@@ -28,11 +29,12 @@ namespace Kaixo::Processing {
             auto& processor = self<SpectralRotatorProcessor>();
 
             switch (index) {
-            case 0:
-                processor.inputFile.rotate(processor.rotatedFile, direction);
-                break;
             case 1:
-                processor.rotatedFile.rotate(processor.rotatedFile, direction, processor.inputFile.file.buffer);
+                if (processor.inputFile.file() == nullptr) {
+                    processor.rotatedFile.rotate(direction);
+                } else {
+                    processor.rotatedFile.rotate(direction, processor.inputFile.file()->buffer);
+                }
                 break;
             }
         });
@@ -111,8 +113,8 @@ namespace Kaixo::Processing {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0: return processor.inputFile.file.path;
-        case 1: return processor.rotatedFile.file.path;
+        case 0: return processor.inputFile.file() ? processor.inputFile.file()->path : "";
+        case 1: return processor.rotatedFile.file() ? processor.rotatedFile.file()->path : "";
         }
 
         return {};
@@ -126,12 +128,14 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 0: {
             std::lock_guard lock{ processor.inputFile.fileMutex };
-            return AudioBufferSpectralInformation::analyze(processor.inputFile.file.buffer, fftSize, horizontalResolution, blockSize, progress);
+            if (processor.inputFile.file() == nullptr) return {};
+            return AudioBufferSpectralInformation::analyze(processor.inputFile.file()->buffer, fftSize, horizontalResolution, blockSize, progress);
             break;
         }
         case 1: {
             std::lock_guard lock{ processor.rotatedFile.fileMutex };
-            return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file.buffer, fftSize, horizontalResolution, blockSize, progress);
+            if (processor.rotatedFile.file() == nullptr) return {};
+            return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file()->buffer, fftSize, horizontalResolution, blockSize, progress);
             break;
         }
         }

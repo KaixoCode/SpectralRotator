@@ -19,15 +19,15 @@ namespace Kaixo::Processing {
 
         // Do not read file while modifying. The modifying functions will
         // wait for this function to finish reading.
-        if (!playing || modifyingFile) {
+        if (!playing || modifyingFile || file() == nullptr) {
             output = 0;
             readingFile = false;
             return;
         }
 
-        resampler.samplerate.in = file.buffer.sampleRate;
+        resampler.samplerate.in = file()->buffer.sampleRate;
         resampler.samplerate.out = sampleRate();
-        output = resampler.generate(file.buffer);
+        output = resampler.generate(file()->buffer);
 
         if (resampler.eof()) {
             playing = false;
@@ -50,13 +50,13 @@ namespace Kaixo::Processing {
     }
 
     void FileHandler::seek(float position) {
-        seekPosition = position * file.buffer.size();
+        seekPosition = position * size();
         newSeekPosition = true;
     }
 
     float FileHandler::position() {
-        if (file.buffer.size() == 0) return 0;
-        return static_cast<float>(resampler.position()) / file.buffer.size();
+        if (size() == 0) return 0;
+        return static_cast<float>(resampler.position()) / size();
     }
 
     // ------------------------------------------------
@@ -73,33 +73,30 @@ namespace Kaixo::Processing {
 
         modifyingFile = true;
         waitForReadingToFinish();
-        FileLoadStatus result = file.open(path, bitDepth, sampleRate);
+        rotations.clear();
+        currentRotation = d000f;
+        FileLoadStatus result = rotations[d000f].open(path, bitDepth, sampleRate);
+        if (result != FileLoadStatus::Success) rotations.clear();
         modifyingFile = false;
         return result;
     }
 
-    void FileHandler::rotate(FileHandler& destination, Rotation direction, const AudioBuffer& originalBuffer) {
+    void FileHandler::rotate(Rotation direction, const AudioBuffer& originalBuffer) {
         std::lock_guard lock{ fileMutex };
 
         modifyingFile = true;
         waitForReadingToFinish();
 
-        bool inPlace = destination.file.buffer.data() == file.buffer.data();
-        destination.writeBuffer(rotator.rotate(file.buffer, direction, originalBuffer), /* Only lock when not in-place*/ !inPlace);
+        int rotated = nextRotation(direction);
 
-        modifyingFile = false;
-    }
+        if (!rotations.contains(rotated)) {
+            auto [from, dir] = getMostEfficientRotationTo(direction);
+            rotations[rotated].buffer = std::move(rotator.rotate(rotations[from].buffer, dir, originalBuffer));
+            rotations[rotated].path = "";      // Buffer changed, so file path no longer valid
+            rotations[rotated].changed = true; // Signal that it has changed
+        }
 
-    void FileHandler::writeBuffer(AudioBuffer&& other, bool doLock) {
-        std::unique_lock lock{ fileMutex, std::defer_lock_t{} };
-        if (doLock) lock.lock();
-
-        modifyingFile = true;
-        waitForReadingToFinish();
-
-        file.buffer = std::move(other);
-        file.path = "";      // Buffer changed, so file path no longer valid
-        file.changed = true; // Signal that it has changed
+        currentRotation = rotated;
 
         modifyingFile = false;
     }
@@ -110,6 +107,107 @@ namespace Kaixo::Processing {
         }
 
         return 1;
+    }
+
+    // ------------------------------------------------
+
+    std::size_t FileHandler::size() {
+        if (auto curFile = file()) return curFile->buffer.size();
+        return 0;
+    }
+
+    // ------------------------------------------------
+
+    AudioFile* FileHandler::file() { return rotations.contains(currentRotation) ? &rotations[currentRotation] : nullptr; }
+
+    int FileHandler::nextRotation(Rotation direction) {
+        switch (direction) {
+        case Rotation::Flip:
+            switch (currentRotation) {
+            case d000f: return d180r;
+            case d090f: return d270r;
+            case d180f: return d000r;
+            case d270f: return d090r;
+            case d000r: return d180f;
+            case d090r: return d270f;
+            case d180r: return d000f;
+            case d270r: return d090f;
+            }
+            break;
+        case Rotation::Reverse:
+            switch (currentRotation) {
+            case d000f: return d000r;
+            case d090f: return d090r;
+            case d180f: return d180r;
+            case d270f: return d270r;
+            case d000r: return d000f;
+            case d090r: return d090f;
+            case d180r: return d180f;
+            case d270r: return d270f;
+            }
+            break;
+        case Rotation::Rotate90:
+            switch (currentRotation) {
+            case d000f: return d090f;
+            case d090f: return d180f;
+            case d180f: return d270f;
+            case d270f: return d000f;
+            case d000r: return d270r;
+            case d090r: return d000r;
+            case d180r: return d090r;
+            case d270r: return d180r;
+            }
+            break;
+        case Rotation::Rotate270:
+            switch (currentRotation) {
+            case d000f: return d270f;
+            case d090f: return d000f;
+            case d180f: return d090f;
+            case d270f: return d180f;
+            case d000r: return d090r;
+            case d090r: return d180r;
+            case d180r: return d270r;
+            case d270r: return d000r;
+            }
+            break;
+        }
+
+        return currentRotation;
+    }
+
+    std::pair<int, Rotation> FileHandler::getMostEfficientRotationTo(Rotation direction) {
+        int goingTo = nextRotation(direction);
+        switch (direction) {
+        case Rotation::Rotate270:
+        case Rotation::Rotate90:
+            switch (goingTo) {
+            case d000f: return rotations.contains(d180r) ? std::pair{ d180r, Rotation::Flip } 
+                             : rotations.contains(d000r) ? std::pair{ d000r, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d090f: return rotations.contains(d270r) ? std::pair{ d270r, Rotation::Flip } 
+                             : rotations.contains(d090r) ? std::pair{ d090r, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d180f: return rotations.contains(d000r) ? std::pair{ d000r, Rotation::Flip } 
+                             : rotations.contains(d180r) ? std::pair{ d180r, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d270f: return rotations.contains(d090r) ? std::pair{ d090r, Rotation::Flip } 
+                             : rotations.contains(d270r) ? std::pair{ d270r, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d000r: return rotations.contains(d180f) ? std::pair{ d180f, Rotation::Flip } 
+                             : rotations.contains(d000f) ? std::pair{ d000f, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d090r: return rotations.contains(d270f) ? std::pair{ d270f, Rotation::Flip } 
+                             : rotations.contains(d090f) ? std::pair{ d090f, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d180r: return rotations.contains(d000f) ? std::pair{ d000f, Rotation::Flip } 
+                             : rotations.contains(d180f) ? std::pair{ d180f, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            case d270r: return rotations.contains(d090f) ? std::pair{ d090f, Rotation::Flip } 
+                             : rotations.contains(d270f) ? std::pair{ d270f, Rotation::Reverse } 
+                             : std::pair{ (int)currentRotation, direction };
+            }
+        }
+        return { (int)currentRotation, direction };
     }
 
     // ------------------------------------------------
