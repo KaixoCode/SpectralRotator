@@ -90,10 +90,29 @@ namespace Kaixo::Processing {
         int rotated = nextRotation(direction);
 
         if (!rotations.contains(rotated)) {
-            auto [from, dir] = getMostEfficientRotationTo(direction);
-            rotations[rotated].buffer = std::move(rotator.rotate(rotations[from].buffer, dir, originalBuffer));
-            rotations[rotated].path = "";      // Buffer changed, so file path no longer valid
-            rotations[rotated].changed = true; // Signal that it has changed
+            if (rotated == d180f) {
+                if (rotations.contains(d000r)) {
+                    rotations[d180f].buffer = std::move(rotator.rotate(rotations[d000r].buffer, Rotation::Flip, originalBuffer));
+                    rotations[d180f].path = "";
+                    rotations[d180f].changed = true;
+                } else {
+                    rotations[d000r].buffer = std::move(rotator.rotate(rotations[d000f].buffer, Rotation::Reverse, originalBuffer));
+                    rotations[d000r].path = "";
+                    rotations[d000r].changed = true;
+                    rotations[d180f].buffer = std::move(rotator.rotate(rotations[d000r].buffer, Rotation::Flip, originalBuffer));
+                    rotations[d180f].path = "";
+                    rotations[d180f].changed = true;
+                }
+            } else if (rotated == d180r) {
+                rotations[d180r].buffer = std::move(rotator.rotate(rotations[d000f].buffer, Rotation::Flip, originalBuffer));
+                rotations[d180r].path = "";
+                rotations[d180r].changed = true;
+            } else {
+                auto [from, dir] = getMostEfficientRotationTo(direction);
+                rotations[rotated].buffer = std::move(rotator.rotate(rotations[from].buffer, dir, originalBuffer));
+                rotations[rotated].path = "";
+                rotations[rotated].changed = true;
+            }
         }
 
         currentRotation = rotated;
