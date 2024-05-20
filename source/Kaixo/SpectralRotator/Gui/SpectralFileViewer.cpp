@@ -22,6 +22,9 @@ namespace Kaixo::Gui {
     SpectralFileViewer::SpectralFileViewer(Context c, Settings s)
         : View(c), settings(std::move(s))
     {
+        // ------------------------------------------------
+
+        setWantsKeyboardFocus(true);
 
         // ------------------------------------------------
             
@@ -132,7 +135,18 @@ namespace Kaixo::Gui {
     }
 
     // ------------------------------------------------
-        
+
+    bool SpectralFileViewer::keyPressed(const juce::KeyPress& event) {
+        if (event.getKeyCode() == event.spaceKey) {
+            settings.file->playPause();
+            return true;
+        }
+
+        return false;
+    }
+
+    // ------------------------------------------------
+
     void SpectralFileViewer::onIdle() {
         View::onIdle();
         if (m_RotateFuture.valid() && m_RotateFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {

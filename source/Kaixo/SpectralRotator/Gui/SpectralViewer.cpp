@@ -16,7 +16,6 @@ namespace Kaixo::Gui {
     SpectralViewer::SpectralViewer(Context c, Settings s)
         : View(c), settings(std::move(s))
     {
-        setWantsKeyboardFocus(true);
         wantsIdle(true);
 
         reGenerateImage(true);
@@ -131,17 +130,6 @@ namespace Kaixo::Gui {
     void SpectralViewer::mouseDrag(const juce::MouseEvent& event) {
         float progress = Math::clamp1(static_cast<float>(event.x) / width());
         settings.file->seek(progress);
-    }
-
-    // ------------------------------------------------
-        
-    bool SpectralViewer::keyPressed(const juce::KeyPress& event) {
-        if (event.getKeyCode() == event.spaceKey) {
-            settings.file->playPause();
-            return true;
-        }
-
-        return false;
     }
 
     // ------------------------------------------------

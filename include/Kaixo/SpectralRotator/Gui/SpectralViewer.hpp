@@ -59,10 +59,6 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
-        bool keyPressed(const juce::KeyPress& event) override;
-
-        // ------------------------------------------------
-        
         void reGenerateImage(bool withAnalyze);
         void fileWillProbablyChangeSoon() { m_FileWillProbablyChange = true; };
         void fileDidNotChange() { m_FileWillProbablyChange = false; };
