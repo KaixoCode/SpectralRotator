@@ -12,46 +12,84 @@
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
+    
+    
 
-    float AudioBufferSpectralInformation::FourierFrame::intensityAt(float x, float dx) {
-        float xval = x * (intensity.size() - 2);
+    // ------------------------------------------------
+    
+    float AudioBufferSpectralInformation::get(std::size_t x, std::size_t y) {
+        std::size_t index = x * frameSize + y;
+        if (index < intensity.size()) return intensity[index];
+        else return 0;
+    }
 
-        std::size_t beginX = Math::max(0, xval - dx / 2);
-        std::size_t endX = Math::min(intensity.size() - 1, xval + dx / 2 + 0.5);
-        std::size_t range = endX - beginX;
-        float max = -INFINITY;
-        float min = 0;
-        for (std::size_t xpos = beginX; xpos < endX; ++xpos) {
-            if (max < intensity[xpos]) max = intensity[xpos];
-            if (min > intensity[xpos]) min = intensity[xpos];
+    // ------------------------------------------------
+
+    float AudioBufferSpectralInformation::intensityAtY(std::size_t x, float y, float dy) {
+        float yval = y * (frameSize - 2);
+        if (dy < 1) {
+            std::size_t beginY = yval;
+            std::size_t endY = yval + 1;
+            float ratio = yval - beginY;
+            ratio *= ratio * ratio;
+            return (get(x, beginY) * (1 - ratio) + get(x, endY) * ratio);
         }
 
-        return (max + min) / 2;
+        std::size_t beginY = Math::max(0, yval - dy / 2);
+        std::size_t endY = Math::min(frameSize - 1, yval + dy / 2 + 1);
+        std::size_t range = endY - beginY;
+
+        float scale = 0;
+        float sum = 0;
+        for (std::size_t ypos = beginY; ypos <= endY; ++ypos) {
+            float window = 0.5 * (1 - Math::Fast::ncos(0.5 * static_cast<float>(ypos - beginY) / (endY - beginY)));
+            sum += get(x, ypos) * window;
+            scale += window;
+        }
+
+        return sum / scale;
     }
 
     // ------------------------------------------------
 
-    float AudioBufferSpectralInformation::intensityAt(float x, float y, float dy) {
-        if (frames.size() == 0) return 0;
+    float AudioBufferSpectralInformation::intensityAt(float x, float dx, float y, float dy) {
+        if (intensity.size() == 0) return 0;
 
-        float xval = x * (frames.size() - 2);
-        std::size_t x1 = xval;
-        std::size_t x2 = 1 + xval;
-        float xRatio = x2 - xval;
+        float xval = x * (frames() - 2);
+        if (dx < 1) {
+            std::size_t beginX = xval;
+            std::size_t endX = xval + 1;
+            float ratio = xval - beginX;
+            ratio *= ratio * ratio;
+            return (intensityAtY(beginX, y, dy) * (1 - ratio) + intensityAtY(endX, y, dy) * ratio);
+        }
 
-        float value1 = frames[x1].intensityAt(y, dy);
-        float value2 = frames[x2].intensityAt(y, dy);
+        std::size_t beginX = Math::max(0, xval - dx / 2);
+        std::size_t endX = Math::min(frames() - 1, xval + dx / 2 + 1);
+        std::size_t range = endX - beginX;
 
-        float db = value1 * xRatio + value2 * (1 - xRatio);
+        float scale = 0;
+        float sum = 0;
+        for (std::size_t xpos = beginX; xpos <= endX; ++xpos) {
+            float window = 0.5 * (1 - Math::Fast::ncos(0.5 * static_cast<float>(xpos - beginX) / (endX - beginX)));
+            sum += intensityAtY(xpos, y, dy) * window;
+            scale += window;
+        }
 
-        return db / 100 + 1;
+        return sum / scale;
     }
 
     // ------------------------------------------------
 
-    AudioBufferSpectralInformation AudioBufferSpectralInformation::analyze(const Processing::AudioBuffer& buffer, std::size_t fftSize, std::size_t horizontalResolution) {
+    AudioBufferSpectralInformation AudioBufferSpectralInformation::analyze(
+        const Processing::AudioBuffer& buffer, std::size_t fftSize, 
+        std::size_t horizontalResolution, std::size_t* progress) 
+    {
+        if (buffer.empty()) return {};
+
         std::size_t stepSize = Math::max(1, buffer.size() / horizontalResolution);
-        std::size_t size = fftSize < buffer.size() ? buffer.size() - fftSize : buffer.size();
+        std::size_t size = buffer.size();
+        std::size_t blockSize = Math::min(fftSize, buffer.sampleRate * 0.05); // 50 millis
 
         auto get = [&](std::size_t index) -> AudioFrame {
             if (index < buffer.size()) return buffer[index];
@@ -61,21 +99,30 @@ namespace Kaixo::Processing {
         std::vector<std::complex<float>> fftBuffer(fftSize);
 
         AudioBufferSpectralInformation result;
-        result.frames.reserve(horizontalResolution);
-        for (std::size_t i = 0; i < size; i += stepSize) {
-            auto& frame = result.frames.emplace_back();
-            frame.intensity.reserve(fftSize / 2);
+        result.frameSize = fftSize / 2 + 1;
+        result.intensity.resize(result.frameSize * horizontalResolution);
+        Fft fft;
+        fft.stepRef = progress;
+        for (std::size_t x = 0; x < horizontalResolution; ++x) {
+            std::size_t i = x * stepSize;
 
-            for (std::size_t j = 0; j < fftSize; ++j) {
-                float window = Math::nsin(0.5 * static_cast<float>(j) / fftSize);
+            std::memset(fftBuffer.data(), 0, fftSize * sizeof(std::complex<float>));
+            float scale = 0;
+            for (std::size_t j = 0; j < blockSize; ++j) {
+                float progress = static_cast<float>(j) / (blockSize - 1);
+                float window = 0.5f * (1.0f - Math::Fast::ncos(progress));
+                scale += window;
                 fftBuffer[j] = get(i + j).average() * window;
             }
 
-            Fft{}.transform(fftBuffer, false);
+            fft.transform(fftBuffer, false);
 
-            float scale = 2.f / std::numbers::pi_v<float>;
-            for (std::size_t j = 0; j < fftSize / 2; ++j) {
-                frame.intensity.push_back(Math::magnitude_to_db(2 * std::abs(fftBuffer[j]) / (fftSize * scale)));
+            for (std::size_t y = 0; y < fftSize / 2 + 1; ++y) {
+                std::size_t index = y + x * result.frameSize;
+                float magnitude = std::abs(fftBuffer[y]);
+                float normalizedMagnitude = (2 * magnitude) / scale; // Apply proper scaling
+                result.intensity[index] = Math::Fast::magnitude_to_db(normalizedMagnitude);
+                if (result.intensity[index] == -INFINITY) result.intensity[index] = -145;
             }
         }
 

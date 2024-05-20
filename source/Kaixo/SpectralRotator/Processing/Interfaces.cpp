@@ -118,18 +118,18 @@ namespace Kaixo::Processing {
         return {};
     }
 
-    AudioBufferSpectralInformation FileInterface::analyzeBuffer(std::size_t fftSize, std::size_t horizontalResolution) {
+    AudioBufferSpectralInformation FileInterface::analyzeBuffer(std::size_t fftSize, std::size_t horizontalResolution, std::size_t* progress) {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
         case 0: {
             std::lock_guard lock{ processor.inputFile.fileMutex };
-            return AudioBufferSpectralInformation::analyze(processor.inputFile.file.buffer, fftSize, horizontalResolution);
+            return AudioBufferSpectralInformation::analyze(processor.inputFile.file.buffer, fftSize, horizontalResolution, progress);
             break;
         }
         case 1: {
             std::lock_guard lock{ processor.rotatedFile.fileMutex };
-            return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file.buffer, fftSize, horizontalResolution);
+            return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file.buffer, fftSize, horizontalResolution, progress);
             break;
         }
         }

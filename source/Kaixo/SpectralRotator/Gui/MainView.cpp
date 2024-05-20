@@ -37,13 +37,13 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
-        auto& rotated = add<SpectralFileViewer>({ 32, 8 + (Height - 12) / 2, Width - 36, (Height - 12) / 2 }, {
+        auto& rotated = add<SpectralFileViewer>({
             .rotatable = true,
             .background = T.rotateBackground,
             .file = rotatedFileInterface,
         });
         
-        add<SpectralFileViewer>({ 32, 4, Width - 36, (Height - 12) / 2 }, {
+        auto& input = add<SpectralFileViewer>({
             .rotatable = false,
             .background = T.sourceBackground,
             .file = inputFileInterface,
@@ -52,7 +52,20 @@ namespace Kaixo::Gui {
         
         // ------------------------------------------------
         
-        auto& settings = add<SettingsView>({ 32, 4, Width - 36, Height - 8 }, {});
+        auto& settings = add<SettingsView>({
+            .fftSizeChanged = [&](int fftSize) {
+                input.spectralViewer().fftSize(fftSize);
+                rotated.spectralViewer().fftSize(fftSize);
+            },
+            .fftResolutionChanged = [&](float value) {
+                input.spectralViewer().fftResolution(value);
+                rotated.spectralViewer().fftResolution(value);
+            },
+            .fftDbDepthChanged = [&](float value) {
+                input.spectralViewer().fftRange(value);
+                rotated.spectralViewer().fftRange(value);
+            }
+        });
         settings.setVisible(false);
 
         // ------------------------------------------------
@@ -60,12 +73,52 @@ namespace Kaixo::Gui {
         add<Button>({ 4, 265, 20, 20 }, {
             .callback = [&](bool) {
                 settings.setVisible(!settings.isVisible());
+                m_ResizedCallback();
             },
             .graphics = T.settings.button
         });
 
         // ------------------------------------------------
+        
+        m_ResizedCallback = [&] {
+            std::size_t newUIType = 0;
+            if (settings.isVisible()) {
+                if (width() < 600) newUIType = DefaultUI;
+                else newUIType = SettingsOnTheSideUI;
+            } else newUIType = DefaultUI;
 
+            if (newUIType == m_UIType) return;
+
+            m_UIType = newUIType;
+
+            switch (m_UIType) {
+            case DefaultUI: {
+                rotated.dimensions(UnevaluatedRect{ 32, 8 + (Height - 12) / 2, Width - 36, (Height - 12) / 2 });
+                input.dimensions(UnevaluatedRect{ 32, 4, Width - 36, (Height - 12) / 2 });
+                settings.dimensions(UnevaluatedRect{ 32, 4, Width - 36, Height - 8 });
+                break;
+            }
+            case SettingsOnTheSideUI: {
+                rotated.dimensions(UnevaluatedRect{ 32, 8 + (Height - 12) / 2, Width - 340, (Height - 12) / 2 });
+                input.dimensions(UnevaluatedRect{ 32, 4, Width - 340, (Height - 12) / 2 });
+                settings.dimensions(UnevaluatedRect{ Width - 304, 4, 300, Height - 8 });
+                break;
+            }
+            }
+
+            rotated.updateDimensions();
+            input.updateDimensions();
+            settings.updateDimensions();
+        };
+
+        // ------------------------------------------------
+
+    }
+
+    // ------------------------------------------------
+    
+    void MainView::resized() {
+        m_ResizedCallback();
     }
 
     // ------------------------------------------------

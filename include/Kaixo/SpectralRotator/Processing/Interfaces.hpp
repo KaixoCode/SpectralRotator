@@ -42,7 +42,7 @@ namespace Kaixo::Processing {
         float position();
 
         std::filesystem::path path();
-        AudioBufferSpectralInformation analyzeBuffer(std::size_t fftSize, std::size_t horizontalResolution);
+        AudioBufferSpectralInformation analyzeBuffer(std::size_t fftSize, std::size_t horizontalResolution, std::size_t* progress = nullptr);
 
         // ------------------------------------------------
         

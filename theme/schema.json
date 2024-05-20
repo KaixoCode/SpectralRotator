@@ -17,7 +17,8 @@
   "settings": {
     "button": "drawable",
     "background": "drawable",
-    "entry": "drawable"
+    "entry": "drawable",
+    "fft-size": "drawable"
   },
 
   "popup": {

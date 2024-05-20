@@ -17,6 +17,16 @@
 
     // ------------------------------------------------
 
+    $button: {
+      background-color: {
+        color: [255, 255, 255, 0]
+        transition: 50
+        hovering: [255, 255, 255, 20]
+      }
+    }
+
+    // ------------------------------------------------
+
   }
   
   // ------------------------------------------------
@@ -64,10 +74,7 @@
 
   settings: {
     button: {
-      background-color: {
-        color: [255, 255, 255, 0]
-        hovering: [255, 255, 255, 20]
-      }
+      extends: $button
       
       image: {
         source: settings.png
@@ -84,16 +91,12 @@
     }
 
     entry: {
-      background-color: {
-        color: [255, 255, 255, 0]
-        transition: 50
-        hovering: [255, 255, 255, 20]
-      }
+      extends: $button
 
       layers: {
         setting: {
           text: {
-            content: $setting-name
+            content: $name
             position: [4, 4]
             align: top-left
             font: $main-font
@@ -103,7 +106,7 @@
 
         value: {
           text: {
-            content: $setting-value
+            content: $value
             position: [100, 4]
             align: top-left
             font: $main-font
@@ -129,10 +132,7 @@
     }
 
     confirm: {
-      background-color: {
-        color: [255, 255, 255, 0]
-        hovering: [255, 255, 255, 20]
-      }
+      extends: $button
 
       text: {
         color: [211, 211, 211]

@@ -55,6 +55,10 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
+        SpectralViewer& spectralViewer() { return *m_SpectralViewer; }
+
+        // ------------------------------------------------
+        
     private:
         SpectralViewer* m_SpectralViewer;
 

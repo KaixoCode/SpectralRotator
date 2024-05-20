@@ -5,22 +5,38 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/Core/Storage.hpp"
+
+// ------------------------------------------------
+
 namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
     SpectralViewer::SpectralViewer(Context c, Settings s)
-        : View(c), settings(std::move(s)) 
+        : View(c), settings(std::move(s))
     {
         setWantsKeyboardFocus(true);
         wantsIdle(true);
 
         reGenerateImage(true);
+
+        if (auto value = Storage::get<int>("fft-size")) {
+            constexpr int fftSizes[]{ 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
+            m_FFTSize = fftSizes[Math::clamp(value.value(), 0, 8)];
+        }
+        
+        if (auto value = Storage::get<int>("fft-resolution")) {
+            constexpr int fftSizes[]{ 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
+            m_FFTResolution = fftSizes[Math::clamp(value.value(), 0, 8)];
+        }
+
+        if (auto value = Storage::get<float>("fft-range")) {
+            m_FFTRange = value.value();
+        }
     }
 
     SpectralViewer::~SpectralViewer() {
-        if (m_GeneratingThread.joinable())
-            m_GeneratingThread.join();
     }
 
     // ------------------------------------------------
@@ -65,6 +81,7 @@ namespace Kaixo::Gui {
         if (m_NewImageReady) {
             m_TryingToAssignNewImage = true;
             if (!m_GeneratingImage) {
+                m_AnalyzingProgress = 0;
                 m_Image = m_Generated;
                 m_NewImageReady = false;
             }
@@ -72,11 +89,14 @@ namespace Kaixo::Gui {
         }
 
         m_ShowingProgress = false;
-        if (settings.file->modifyingFile() || m_GeneratingImage || m_FileWillProbablyChange) {
+        if (settings.file->modifyingFile() || (!m_CausedByResize && m_GeneratingImage) || m_FileWillProbablyChange) {
             m_ShowingProgress = true;
             float fileLoadingProgress = settings.file->loadingProgress();
             float analyzingProgress = static_cast<float>(m_AnalyzingProgress) / m_AnalyzingProgressTotal;
-            float progress = fileLoadingProgress * 0.8 + 0.2 * analyzingProgress;
+            float progress = m_FileWillProbablyChange 
+                ? fileLoadingProgress * 0.5 + 0.5 * analyzingProgress // If file also changed, add to progress bar
+                : analyzingProgress; // Otherwise just analyzing progress
+
             m_Loading.draw({
                 .graphics = g,
                 .bounds = localDimensions(),
@@ -118,34 +138,40 @@ namespace Kaixo::Gui {
     // ------------------------------------------------
         
     void SpectralViewer::reGenerateImage(bool withAnalyze) {
-        m_GeneratingImage = true;
+        m_CausedByResize = m_DidResize;
+        if (withAnalyze) m_ShouldAnalyze = true;
 
-        // Wait for pre-existing thread before starting new
-        if (m_GeneratingThread.joinable())
-            m_GeneratingThread.join();
-        m_GeneratingThread = std::thread([&, withAnalyze]() {
+        m_GeneratingThreadPool.clear(); // Clear any tasks, only the latest one is important!
+        m_GeneratingThreadPool.push([&]() {
             std::lock_guard lock{ m_AnalyzeResultMutex };
 
             // Little spin wait until no longer assigning image in paint() method
+            m_GeneratingImage = true;
             while (m_TryingToAssignNewImage) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
 
-            if (withAnalyze) {
-                m_AnalyzeResult = settings.file->analyzeBuffer(2048, 2048);
+            if (m_ShouldAnalyze) {
+                m_ShouldAnalyze = false;
+                m_FileWillProbablyChange = false; // We're reanalyzing now
+                m_AnalyzingProgress = 0;
+                m_AnalyzingProgressTotal = width() * height() + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution;
+                m_AnalyzeResult = settings.file->analyzeBuffer(m_FFTSize, m_FFTResolution, &m_AnalyzingProgress);
+            } else {
+                m_AnalyzingProgress = 0;
+                m_AnalyzingProgressTotal = width() * height();
             }
 
             m_Generated = juce::Image(juce::Image::PixelFormat::ARGB, width(), height(), true);
-            m_AnalyzingProgressTotal = width() * height();
-            m_AnalyzingProgress = 0;
 
             for (std::size_t x = 0; x < m_Generated.getWidth(); ++x) {
                 for (std::size_t y = 0; y < m_Generated.getHeight(); ++y) {
                     float nx = static_cast<float>(x) / m_Generated.getWidth();
                     float ny = 1 - static_cast<float>(y) / m_Generated.getHeight();
-                    float dy = 2048 * (1.f / m_Generated.getHeight());
+                    float dy = m_FFTSize * (1.f / m_Generated.getHeight());
+                    float dx = m_FFTResolution * (1.f / m_Generated.getWidth());
 
-                    float intensity = m_AnalyzeResult.intensityAt(nx, ny, dy);
+                    float intensity = m_AnalyzeResult.intensityAt(nx, dx, ny, dy) / m_FFTRange + 1;
 
                     Color c1 = T.spectrum.color1.color.base;
                     Color c2 = T.spectrum.color2.color.base;
@@ -160,10 +186,29 @@ namespace Kaixo::Gui {
                 }
             }
 
-            m_FileWillProbablyChange = false; // Regenerated, so doesn't matter anymore
             m_GeneratingImage = false;
             m_NewImageReady = true;
         });
+    }
+
+    // ------------------------------------------------
+
+    void SpectralViewer::fftSize(std::size_t size) {
+        if (size == m_FFTSize) return;
+        m_FFTSize = size;
+        reGenerateImage(true);
+    }
+    
+    void SpectralViewer::fftResolution(std::size_t size) {
+        if (size == m_FFTResolution) return;
+        m_FFTResolution = size;
+        reGenerateImage(true);
+    }
+    
+    void SpectralViewer::fftRange(float range) {
+        if (range == m_FFTRange) return;
+        m_FFTRange = range;
+        reGenerateImage(false);
     }
 
     // ------------------------------------------------

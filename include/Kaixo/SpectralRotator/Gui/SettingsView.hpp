@@ -64,6 +64,14 @@ namespace Kaixo::Gui {
 
         struct Settings {
 
+            // ------------------------------------------------
+
+            std::function<void(int)> fftSizeChanged;
+            std::function<void(int)> fftResolutionChanged;
+            std::function<void(float)> fftDbDepthChanged;
+
+            // ------------------------------------------------
+
         } settings;
 
         // ------------------------------------------------
