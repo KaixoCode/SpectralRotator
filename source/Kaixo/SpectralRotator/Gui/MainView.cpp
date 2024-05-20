@@ -57,9 +57,13 @@ namespace Kaixo::Gui {
                 input.spectralViewer().fftSize(fftSize);
                 rotated.spectralViewer().fftSize(fftSize);
             },
-            .fftResolutionChanged = [&](float value) {
+            .fftResolutionChanged = [&](int value) {
                 input.spectralViewer().fftResolution(value);
                 rotated.spectralViewer().fftResolution(value);
+            },            
+            .fftBlockSizeChanged = [&](int value) {
+                input.spectralViewer().fftBlockSize(value);
+                rotated.spectralViewer().fftBlockSize(value);
             },
             .fftDbDepthChanged = [&](float value) {
                 input.spectralViewer().fftRange(value);

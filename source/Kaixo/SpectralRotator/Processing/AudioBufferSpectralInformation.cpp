@@ -83,13 +83,12 @@ namespace Kaixo::Processing {
 
     AudioBufferSpectralInformation AudioBufferSpectralInformation::analyze(
         const Processing::AudioBuffer& buffer, std::size_t fftSize, 
-        std::size_t horizontalResolution, std::size_t* progress) 
+        std::size_t horizontalResolution, std::size_t bSizeMs, std::size_t* progress) 
     {
         if (buffer.empty()) return {};
 
-        std::size_t stepSize = Math::max(1, buffer.size() / horizontalResolution);
         std::size_t size = buffer.size();
-        std::size_t blockSize = Math::min(fftSize, buffer.sampleRate * 0.05); // 50 millis
+        std::size_t blockSize = Math::min(fftSize, buffer.sampleRate * (bSizeMs / 1000.f));
 
         auto get = [&](std::size_t index) -> AudioFrame {
             if (index < buffer.size()) return buffer[index];
@@ -104,7 +103,7 @@ namespace Kaixo::Processing {
         Fft fft;
         fft.stepRef = progress;
         for (std::size_t x = 0; x < horizontalResolution; ++x) {
-            std::size_t i = x * stepSize;
+            std::size_t i = x * (static_cast<float>(buffer.size()) / horizontalResolution);
 
             std::memset(fftBuffer.data(), 0, fftSize * sizeof(std::complex<float>));
             float scale = 0;
@@ -122,7 +121,7 @@ namespace Kaixo::Processing {
                 float magnitude = std::abs(fftBuffer[y]);
                 float normalizedMagnitude = (2 * magnitude) / scale; // Apply proper scaling
                 result.intensity[index] = Math::Fast::magnitude_to_db(normalizedMagnitude);
-                if (result.intensity[index] == -INFINITY) result.intensity[index] = -145;
+                if (result.intensity[index] < -145) result.intensity[index] = -145;
             }
         }
 

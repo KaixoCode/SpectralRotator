@@ -18,7 +18,7 @@
     "button": "drawable",
     "background": "drawable",
     "entry": "drawable",
-    "fft-size": "drawable"
+    "open-folder": "drawable"
   },
 
   "popup": {

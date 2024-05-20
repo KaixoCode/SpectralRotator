@@ -30,6 +30,11 @@ namespace Kaixo::Gui {
             constexpr int fftSizes[]{ 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
             m_FFTResolution = fftSizes[Math::clamp(value.value(), 0, 8)];
         }
+        
+        if (auto value = Storage::get<int>("fft-block-size")) {
+            constexpr int fftSizes[]{ 5, 10, 25, 50, 75, 100 };
+            m_FFTBlockSize = fftSizes[Math::clamp(value.value(), 0, 5)];
+        }
 
         if (auto value = Storage::get<float>("fft-range")) {
             m_FFTRange = value.value();
@@ -88,27 +93,31 @@ namespace Kaixo::Gui {
             m_TryingToAssignNewImage = false;
         }
 
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(m_Image, localDimensions().toFloat());
+
+        float x = m_PlayPosition * (width() - 3);
+        g.setColour({ 210, 210, 210 });
+        g.fillRect(Rect{ x, 0, 3, height() });
+
         m_ShowingProgress = false;
         if (settings.file->modifyingFile() || (!m_CausedByResize && m_GeneratingImage) || m_FileWillProbablyChange) {
             m_ShowingProgress = true;
+            bool rotating = settings.file->modifyingFile();
             float fileLoadingProgress = settings.file->loadingProgress();
             float analyzingProgress = static_cast<float>(m_AnalyzingProgress) / m_AnalyzingProgressTotal;
-            float progress = m_FileWillProbablyChange 
-                ? fileLoadingProgress * 0.5 + 0.5 * analyzingProgress // If file also changed, add to progress bar
-                : analyzingProgress; // Otherwise just analyzing progress
+            float progress = rotating
+                ? fileLoadingProgress // If file also changed, add to progress bar
+                : analyzingProgress;  // Otherwise just analyzing progress
 
             m_Loading.draw({
                 .graphics = g,
                 .bounds = localDimensions(),
-                .text = { { "$progress", std::format("%{:.0f}", progress * 100) }}
+                .text = { 
+                    { "$progress", std::format("%{:.0f}", progress * 100) },
+                    { "$load-type", rotating ? "Rotating" : "Analyzing" }
+                }
             });
-        } else {
-            g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-            g.drawImage(m_Image, localDimensions().toFloat());
-
-            float x = m_PlayPosition * (width() - 3);
-            g.setColour({ 210, 210, 210 });
-            g.fillRect(Rect{ x, 0, 3, height() });
         }
     }
 
@@ -153,10 +162,9 @@ namespace Kaixo::Gui {
 
             if (m_ShouldAnalyze) {
                 m_ShouldAnalyze = false;
-                m_FileWillProbablyChange = false; // We're reanalyzing now
                 m_AnalyzingProgress = 0;
                 m_AnalyzingProgressTotal = width() * height() + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution;
-                m_AnalyzeResult = settings.file->analyzeBuffer(m_FFTSize, m_FFTResolution, &m_AnalyzingProgress);
+                m_AnalyzeResult = settings.file->analyzeBuffer(m_FFTSize, m_FFTResolution, m_FFTBlockSize , &m_AnalyzingProgress);
             } else {
                 m_AnalyzingProgress = 0;
                 m_AnalyzingProgressTotal = width() * height();
@@ -186,6 +194,7 @@ namespace Kaixo::Gui {
                 }
             }
 
+            m_FileWillProbablyChange = false; // We're reanalyzing now
             m_GeneratingImage = false;
             m_NewImageReady = true;
         });
@@ -202,6 +211,12 @@ namespace Kaixo::Gui {
     void SpectralViewer::fftResolution(std::size_t size) {
         if (size == m_FFTResolution) return;
         m_FFTResolution = size;
+        reGenerateImage(true);
+    }
+    
+    void SpectralViewer::fftBlockSize(std::size_t ms) {
+        if (ms == m_FFTBlockSize) return;
+        m_FFTBlockSize = ms;
         reGenerateImage(true);
     }
     

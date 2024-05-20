@@ -34,7 +34,7 @@ namespace Kaixo::Gui {
 
                 // ------------------------------------------------
 
-                std::function<void(void)> click;
+                std::function<void(std::string&)> click;
 
                 // ------------------------------------------------
 
@@ -57,6 +57,10 @@ namespace Kaixo::Gui {
             void paint(juce::Graphics& g) override;
 
             // ------------------------------------------------
+            
+            void changeValue(std::string_view val) { settings.value = val; repaint(); }
+
+            // ------------------------------------------------
 
         };
 
@@ -68,6 +72,7 @@ namespace Kaixo::Gui {
 
             std::function<void(int)> fftSizeChanged;
             std::function<void(int)> fftResolutionChanged;
+            std::function<void(int)> fftBlockSizeChanged;
             std::function<void(float)> fftDbDepthChanged;
 
             // ------------------------------------------------
@@ -78,6 +83,10 @@ namespace Kaixo::Gui {
 
         SettingsView(Context c, Settings s);
 
+        // ------------------------------------------------
+        
+        std::unique_ptr<FileChooser> generationDirectoryChooser{};
+        
         // ------------------------------------------------
 
     };

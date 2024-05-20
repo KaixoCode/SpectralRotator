@@ -42,7 +42,7 @@ namespace Kaixo::Processing {
         
         static AudioBufferSpectralInformation analyze(
             const Processing::AudioBuffer& buffer, std::size_t fftSize, 
-            std::size_t horizontalResolution, std::size_t* progress);
+            std::size_t horizontalResolution, std::size_t blockSize, std::size_t* progress);
 
         // ------------------------------------------------
 

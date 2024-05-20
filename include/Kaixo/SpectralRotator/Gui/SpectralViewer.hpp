@@ -71,6 +71,7 @@ namespace Kaixo::Gui {
         
         void fftSize(std::size_t size);
         void fftResolution(std::size_t range);
+        void fftBlockSize(std::size_t ms);
         void fftRange(float range);
 
         // ------------------------------------------------
@@ -82,6 +83,7 @@ namespace Kaixo::Gui {
 
         std::size_t m_FFTSize = 2048;
         std::size_t m_FFTResolution = 2048;
+        std::size_t m_FFTBlockSize = 50;
         float m_FFTRange = 48;
         std::size_t m_AnalyzingProgress = 0;
         std::size_t m_AnalyzingProgressTotal = 0;
@@ -89,8 +91,8 @@ namespace Kaixo::Gui {
         bool m_DidResize = false;
         std::atomic_bool m_NewImageReady = false;
         std::atomic_bool m_TryingToAssignNewImage = false;
-        std::atomic_bool m_CausedByResize = false;
         std::atomic_bool m_GeneratingImage = false;
+        std::atomic_bool m_CausedByResize = false;
         std::atomic_bool m_ShouldAnalyze = false;
         std::atomic_bool m_FileWillProbablyChange = false;
         Processing::AudioBufferSpectralInformation m_AnalyzeResult;

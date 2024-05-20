@@ -82,6 +82,14 @@
       }
     }
 
+    open-folder: {
+      extends: $button
+      
+      image: {
+        source: open-folder.png
+        align: center
+      }
+    }
 
     background: {
       image: {
@@ -107,7 +115,7 @@
         value: {
           text: {
             content: $value
-            position: [100, 4]
+            position: [110, 4]
             align: top-left
             font: $main-font
             color: [211, 211, 211]
@@ -203,9 +211,9 @@
   }
 
   loading: {
-    background-color: [27, 27, 27]
+    background-color: [27, 27, 27, 60]
     text: {
-      content: Loading... $progress
+      content: $load-type... $progress
       align: center
       font: $main-font
       color: [211, 211, 211]

@@ -5,6 +5,7 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/Core/Storage.hpp"
 #include "Kaixo/Utils/Decoders/Decoder.hpp"
 
 // ------------------------------------------------
@@ -54,7 +55,7 @@ namespace Kaixo {
         if (!std::filesystem::exists(path)) {
             std::filesystem::create_directories(path);
         }
-        return path;
+        return Storage::getOrDefault<std::string>("generation-directory", path.string());
     }
 
     // ------------------------------------------------
