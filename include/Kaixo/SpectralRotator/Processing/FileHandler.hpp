@@ -62,6 +62,7 @@ namespace Kaixo::Processing {
 
         int nextRotation(Rotation direction);
         std::pair<int, Rotation> getMostEfficientRotationTo(Rotation direction);
+        std::string generateSaveFileName();
 
         // ------------------------------------------------
 

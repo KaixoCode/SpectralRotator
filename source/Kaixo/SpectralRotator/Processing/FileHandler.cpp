@@ -231,6 +231,23 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
+    std::string FileHandler::generateSaveFileName() {
+        std::string originalFilename = rotations[d000f].path.stem().string();
+        switch (currentRotation) {
+        case d000f: return originalFilename;
+        case d000r: return originalFilename + "-reversed";
+        case d090f: return originalFilename + "-90";
+        case d180f: return originalFilename + "-180";
+        case d270f: return originalFilename + "-270";
+        case d090r: return originalFilename + "-90-reversed";
+        case d180r: return originalFilename + "-flipped";
+        case d270r: return originalFilename + "-270-reversed";
+        }
+        return originalFilename + "-rotated";
+    }
+
+    // ------------------------------------------------
+
 }
 
 // ------------------------------------------------

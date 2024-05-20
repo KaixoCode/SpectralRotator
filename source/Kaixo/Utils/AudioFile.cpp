@@ -36,7 +36,7 @@ namespace Kaixo {
             std::stringstream datetime{};
             datetime << std::put_time(std::localtime(&in_time_t), "%Y%m%d-%H%M%S");
 
-            auto name = filename + "-rotated-" + datetime.str() + ".wav";
+            auto name = filename + "-" + datetime.str() + ".wav";
 
             path = generationLocation() / name;
             write(path);

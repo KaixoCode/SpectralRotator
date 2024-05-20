@@ -19,7 +19,7 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 1:
             if (processor.rotatedFile.file() == nullptr) return;
-            processor.rotatedFile.file()->save(processor.inputFile.file()->path.stem().string());
+            processor.rotatedFile.file()->save(processor.rotatedFile.generateSaveFileName());
             break;
         }
     }
