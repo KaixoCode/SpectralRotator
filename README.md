@@ -11,7 +11,7 @@ Unfortunately I do not have access to an iOS device to compile it for Mac, so **
 ## How To Use The Plugin
 When you open the plugin you are faced with two simple samplers: *source* and *rotate*. Start by dropping a sample into the *source* sampler, this will load the sample in both *source* and *rotate*. You can then press the buttons on the *rotate* sampler to rotate the frequency spectrum into any orientation. Once you've rotated the sample, you can drag the result back into your DAW by hovering over the "rotate" text and dragging.
 
-![rotated sample](https://assets.kaixo.me/SpectralRotator/rotated-sample-ui.png)
+![rotated sample](https://assets.kaixo.me/SpectralRotator/rotated-sample-ui-1.1.0.png)
 
 After you've applied effects to your rotated sample, you can drop it back into the *rotate* sampler. Make sure you still have the original source sample in the *source* sampler. This is important because we need to know how long the original sample was to rotate it back properly, as the length of your edited sample might have changed. Once the edited sample has loaded, you can rotate it back to its original orientation, and drag it back into your DAW.
 
@@ -19,7 +19,7 @@ You can also listen to the loaded samples by clicking on the spectrum view, and 
 
 Any samples you've dragged out of this plugin are stored in the output folder, which defaults to a folder somewhere in the user's application data directory. You can find the exact path by clicking on the settings icon and looking at the "output folder". You can change this path by clicking on it and selecting a different folder. Clicking on the icon to the right of the path opens the folder in the default file explorer. You can close the settings by clicking on the settings icon again.
 
-![settings](https://assets.kaixo.me/SpectralRotator/settings-ui.png)
+![settings](https://assets.kaixo.me/SpectralRotator/settings-ui-1.1.0.png)
 
 The spectrum view is also fully customizable, you can adjust the FFT size, resolution, block size, and range. The FFT size changes the vertical resolution, the FFT resolution changes the horizontal resolution, the block size determines the length of the block that is used for every FFT, and the FFT range adjusts how many decibels are visible.
 
