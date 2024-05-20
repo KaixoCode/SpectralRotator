@@ -17,9 +17,11 @@ After you've applied effects to your rotated sample, you can drop it back into t
 
 You can also listen to the loaded samples by clicking on the spectrum view, and pressing space bar. This will play/pause playback of this sampler. You can skip to any position in the sample by clicking anywhere on the spectrum view.
 
-Any samples you've dragged out of this plugin are stored in a folder somewhere in the user's application data directory. You can find the exact path by clicking on the settings icon and looking at the "output folder", you can also click on this to open the folder in the default file explorer. You can close the settings by clicking on the settings icon again.
+Any samples you've dragged out of this plugin are stored in the output folder, which defaults to a folder somewhere in the user's application data directory. You can find the exact path by clicking on the settings icon and looking at the "output folder". You can change this path by clicking on it and selecting a different folder. Clicking on the icon to the right of the path opens the folder in the default file explorer. You can close the settings by clicking on the settings icon again.
 
 ![settings](https://assets.kaixo.me/SpectralRotator/settings-ui.png)
+
+The spectrum view is also fully customizable, you can adjust the FFT size, resolution, block size, and range. The FFT size changes the vertical resolution, the FFT resolution changes the horizontal resolution, the block size determines the length of the block that is used for every FFT, and the FFT range adjusts how many decibels are visible.
 
 **An important note** when dropping modified rotated samples back into SpectralRotator is that you align the bottom of your spectrum properly. For example, when you have rotated your spectrum such that the lower frequencies are on the left, you must make sure when you import your edited sample, that the start of your sample is aligned (If it was rotated such that the lower frequencies are on the right, you would have to align the end of your sample). Otherwise a small frequency shift will occur, depending on how many audio samples of delay there are. You do not have to worry about making sure the sample is exactly the same length though, as it will take this information from the *source* sampler. 
 
