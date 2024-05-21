@@ -15,7 +15,7 @@ namespace Kaixo {
     // ------------------------------------------------
 
     FileLoadStatus AudioFile::open(std::filesystem::path f, std::size_t bitDepth, double sampleRate) {
-        auto res = decode(buffer, f, 48000 * 32, bitDepth, sampleRate);
+        auto res = decode(buffer, f, npos, bitDepth, sampleRate);
         if (res == FileLoadStatus::Success) {
             changed = false;
             path = f;
