@@ -19,6 +19,7 @@ namespace Kaixo::Processing {
         registerModule(rotatedFile);
 
         registerInterface<FileInterface>();
+        registerInterface<AdvancedFileInterface>();
     }
 
     // ------------------------------------------------

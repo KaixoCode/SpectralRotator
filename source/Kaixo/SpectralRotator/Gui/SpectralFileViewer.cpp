@@ -12,6 +12,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/Utils/AudioFile.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/AdvancedFileInterface.hpp"
 
 // ------------------------------------------------
 
@@ -89,6 +90,36 @@ namespace Kaixo::Gui {
                     if (m_RotateFuture.valid()) return; // Can't rotate while waiting
                     m_RotateFuture = settings.file->rotate(Processing::Rotation::Reverse);
                     m_SpectralViewer->fileWillProbablyChangeSoon();
+                },
+                .graphics = T.reverse
+            });
+
+            add<Button>({
+                200, 8, 20, 20
+            }, {
+                .callback = [&](bool) {
+                    context.interface<Processing::AdvancedFileInterface>({.index = 1 })->removeRect({ 0.2, 0.2, 0.4, 0.4 });
+                    m_SpectralViewer->reGenerateImage(true);
+                },
+                .graphics = T.reverse
+            });
+
+            add<Button>({
+                224, 8, 20, 20
+            }, {
+                .callback = [&](bool) {
+                    context.interface<Processing::AdvancedFileInterface>({ .index = 1 })->keepRect({0.2, 0.2, 0.4, 0.4});
+                    m_SpectralViewer->reGenerateImage(true);
+                },
+                .graphics = T.reverse
+            });
+
+            add<Button>({
+                248, 8, 20, 20
+            }, {
+                .callback = [&](bool) {
+                    context.interface<Processing::AdvancedFileInterface>({.index = 1 })->moveRect({0.2, 0.2, 0.4, 0.4}, { 0.2, 0.1 });
+                    m_SpectralViewer->reGenerateImage(true);
                 },
                 .graphics = T.reverse
             });

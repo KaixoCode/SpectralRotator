@@ -18,6 +18,7 @@ namespace Kaixo::Processing {
         std::vector<std::complex<float>> r;
 
         constexpr std::size_t size() const { return l.size(); }
+        constexpr bool empty() const { return l.empty(); }
 
         constexpr void reserve(std::size_t size) {
             l.reserve(size);

@@ -13,6 +13,7 @@
 
 #include "Kaixo/SpectralRotator/Gui/SpectralFileViewer.hpp"
 #include "Kaixo/SpectralRotator/Gui/SettingsView.hpp"
+#include "Kaixo/SpectralRotator/Gui/AdvancedFileView.hpp"
 
 // ------------------------------------------------
 
@@ -80,6 +81,20 @@ namespace Kaixo::Gui {
                 m_ResizedCallback();
             },
             .graphics = T.settings.button
+        });
+        
+        // ------------------------------------------------
+        
+        auto& advanced = add<AdvancedFileView>({ 32, 4, Width - 36, Height - 8 }, {});
+
+        // ------------------------------------------------
+        
+        add<Button>({ 4, 289, 20, 20 }, {
+            .callback = [&](bool) {
+                advanced.setVisible(!advanced.isVisible());
+                m_ResizedCallback();
+            },
+            .graphics = T.button
         });
 
         // ------------------------------------------------

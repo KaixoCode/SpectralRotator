@@ -29,6 +29,10 @@
     "message": "text-area"
   },
 
+  "advanced": {
+    "scrollbar": "drawable"
+  },
+
   "rotate-90": "drawable",
   "rotate-270": "drawable",
   "flip": "drawable",

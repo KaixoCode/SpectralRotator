@@ -50,8 +50,8 @@ namespace Kaixo::Processing {
                 processor.rotatedFile.open(path, bitDepth, sampleRate);
                 return status;
             }
-            case 1:
-                return processor.rotatedFile.open(path, bitDepth, sampleRate);
+            case 1: return processor.rotatedFile.open(path, bitDepth, sampleRate);
+            case 2: return processor.editor.open(path, bitDepth, sampleRate);
             }
 
             return FileLoadStatus::NotExists;
@@ -64,6 +64,7 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 0: return processor.inputFile.modifyingFile;
         case 1: return processor.rotatedFile.modifyingFile;
+        case 2: return processor.editor.modifyingFile;
         }
 
         return false;
@@ -75,6 +76,7 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 0: return processor.inputFile.loadingProgress();
         case 1: return processor.rotatedFile.loadingProgress();
+        case 2: return processor.editor.loadingProgress();
         }
 
         return 1;
@@ -86,6 +88,7 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 0: processor.inputFile.playPause(); break;       
         case 1: processor.rotatedFile.playPause(); break; 
+        case 2: processor.editor.playPause(); break; 
         }
     }
 
@@ -95,6 +98,7 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 0: processor.inputFile.seek(position); break;
         case 1: processor.rotatedFile.seek(position); break;
+        case 2: processor.editor.seek(position); break;
         }
     }
     
@@ -104,6 +108,7 @@ namespace Kaixo::Processing {
         switch (settings.index) {
         case 0: return processor.inputFile.position();
         case 1: return processor.rotatedFile.position();
+        case 2: return processor.editor.position();
         }
 
         return 0;
@@ -136,6 +141,12 @@ namespace Kaixo::Processing {
             std::lock_guard lock{ processor.rotatedFile.fileMutex };
             if (processor.rotatedFile.file() == nullptr) return {};
             return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file()->buffer, fftSize, horizontalResolution, blockSize, progress);
+            break;
+        }        
+        case 2: {
+            std::lock_guard lock{ processor.editor.fileMutex };
+            auto combinedBuffer = processor.editor.combined();
+            return AudioBufferSpectralInformation::analyze(combinedBuffer, fftSize, horizontalResolution, blockSize, progress);
             break;
         }
         }

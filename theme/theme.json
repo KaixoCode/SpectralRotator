@@ -58,6 +58,12 @@
     color5: [255, 255, 255]
   }
 
+  advanced: {
+    scrollbar: {
+      background-color: [90, 90, 90]
+    }
+  }
+
   source-background: {
     image: {
       source: source-background.png
