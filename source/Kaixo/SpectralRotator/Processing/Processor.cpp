@@ -5,7 +5,8 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/Interfaces.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/FileInterface.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/AdvancedFileInterface.hpp"
 
 // ------------------------------------------------
 

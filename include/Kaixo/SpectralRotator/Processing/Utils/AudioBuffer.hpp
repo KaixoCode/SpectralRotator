@@ -9,7 +9,7 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/AudioFrame.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioFrame.hpp"
 
 // ------------------------------------------------
 

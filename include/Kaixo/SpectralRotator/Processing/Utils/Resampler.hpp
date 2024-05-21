@@ -7,7 +7,7 @@
 
 #include "Kaixo/Core/Processing/Module.hpp"
 #include "Kaixo/Core/Processing/Filter.hpp"
-#include "Kaixo/SpectralRotator/Processing/AudioBuffer.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioBuffer.hpp"
 
 // ------------------------------------------------
 

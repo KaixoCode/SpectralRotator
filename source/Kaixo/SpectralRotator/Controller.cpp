@@ -6,8 +6,6 @@
 // ------------------------------------------------
 
 #include "Kaixo/Core/Theme/Theme.hpp"
-#include "Kaixo/Utils/AudioFile.hpp"
-#include "Kaixo/SpectralRotator/Processing/Rotator.hpp"
 
 // ------------------------------------------------
 

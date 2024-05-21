@@ -10,7 +10,7 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/Interfaces.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/FileInterface.hpp"
 
 // ------------------------------------------------
 

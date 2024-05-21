@@ -9,9 +9,9 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/Fft.hpp"
-#include "Kaixo/SpectralRotator/Processing/AudioBuffer.hpp"
-#include "Kaixo/SpectralRotator/Processing/ComplexBuffer.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/Fft.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioBuffer.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/ComplexBuffer.hpp"
 
 // ------------------------------------------------
 

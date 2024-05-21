@@ -1,7 +1,7 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/Resampler.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/Resampler.hpp"
 
 // ------------------------------------------------
 

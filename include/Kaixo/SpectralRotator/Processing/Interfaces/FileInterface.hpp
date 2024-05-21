@@ -11,8 +11,8 @@
 // ------------------------------------------------
 
 #include "Kaixo/Utils/AudioFile.hpp"
-#include "Kaixo/SpectralRotator/Processing/AudioBuffer.hpp"
-#include "Kaixo/SpectralRotator/Processing/AudioBufferSpectralInformation.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioBuffer.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioBufferSpectralInformation.hpp"
 
 // ------------------------------------------------
 

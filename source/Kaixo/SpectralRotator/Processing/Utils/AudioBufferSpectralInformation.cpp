@@ -1,11 +1,11 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/AudioBufferSpectralInformation.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioBufferSpectralInformation.hpp"
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/Fft.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/Fft.hpp"
 
 // ------------------------------------------------
 

@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <utility>
-#include "Kaixo/SpectralRotator/Processing/Fft.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/Fft.hpp"
 
 // ------------------------------------------------
 
