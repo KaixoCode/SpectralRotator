@@ -60,6 +60,10 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
         
+        Rect<std::int64_t> denormalizeRect(Rect<float> rect);
+
+        // ------------------------------------------------
+        
         AudioFile file;
         std::size_t selectedLayer = 0;
 
@@ -67,8 +71,7 @@ namespace Kaixo::Processing {
 
         struct Layer {
             Processing::AudioBuffer buffer{};
-            float delay = 0;  // ms
-            float offset = 0; // Hz
+            std::int64_t delay = 0; // samples
         };
 
         std::map<std::size_t, Layer> layers;
