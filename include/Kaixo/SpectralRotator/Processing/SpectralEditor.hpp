@@ -17,7 +17,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    class AdvancedSpectralEditor : public Module {
+    class SpectralEditor : public Module {
     public:
         
         // ------------------------------------------------

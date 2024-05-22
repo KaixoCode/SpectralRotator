@@ -12,7 +12,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/Utils/AudioFile.hpp"
-#include "Kaixo/SpectralRotator/Processing/Interfaces/AdvancedFileInterface.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/EditorInterface.hpp"
 
 // ------------------------------------------------
 
@@ -20,8 +20,64 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
+    FileDropTarget::FileDropTarget(Processing::InterfaceStorage<Processing::FileInterface> file)
+        : file(std::move(file))
+    {}
+
+    bool FileDropTarget::isInterestedInFileDrag(const StringArray& files) {
+        if (m_FileLoadFuture.valid()) return false; // cannot drop while loading other file
+        if (file->modifyingFile()) return false; // cannot drop when file is being modified
+        return files.size() == 1/* && (files[0].endsWith(".wav") || files[0].endsWith(".mp3"))*/;
+    }
+
+    void FileDropTarget::filesDropped(const StringArray& files, int x, int y) {
+        if (isInterestedInFileDrag(files)) {
+            std::filesystem::path path = files[0].toStdString();
+            if (path.extension() == ".mp3" || path.extension() == ".wav") {
+                m_FileLoadFuture = file->openFile(path);
+                tryingToOpenFile();
+            } else if (nonAudioLoadPopupView) {
+                nonAudioLoadPopupView->open([&, path](std::size_t bitDepth, double sampleRate) {
+                    m_FileLoadFuture = file->openFile(path, bitDepth, sampleRate);
+                    tryingToOpenFile();
+                });
+            }
+        }
+    }
+
+    void FileDropTarget::onIdle() {
+        if (m_FileLoadFuture.valid() && m_FileLoadFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+            constexpr auto errorMessage = [](FileLoadStatus status) {
+                switch (status) {
+                case FileLoadStatus::Error:
+                    return "An error occurred while opening the file";
+                    break;      
+                case FileLoadStatus::FailedToOpen:
+                    return "Failed to open file";
+                    break;
+                case FileLoadStatus::NotExists:
+                    return "File does not exist";
+                    break;     
+                case FileLoadStatus::TooLarge:
+                    return "File is too large";
+                    break;
+                }
+            };
+
+            auto status = m_FileLoadFuture.get();
+            m_FileLoadFuture = {}; // Make future invalid
+            if (notificationPopupView && status != FileLoadStatus::Success) {
+                notificationPopupView->open(errorMessage(status));
+            }
+
+            fileOpened(status);
+        }
+    }
+
+    // ------------------------------------------------
+
     SpectralFileViewer::SpectralFileViewer(Context c, Settings s)
-        : View(c), settings(std::move(s))
+        : View(c), FileDropTarget(s.file), settings(std::move(s))
     {
         // ------------------------------------------------
 
@@ -93,45 +149,15 @@ namespace Kaixo::Gui {
                 },
                 .graphics = T.reverse
             });
-
-            add<Button>({
-                200, 8, 20, 20
-            }, {
-                .callback = [&](bool) {
-                    context.interface<Processing::AdvancedFileInterface>({.index = 1 })->removeRect({ 0.2, 0.2, 0.4, 0.4 });
-                    m_SpectralViewer->reGenerateImage(true);
-                },
-                .graphics = T.reverse
-            });
-
-            add<Button>({
-                224, 8, 20, 20
-            }, {
-                .callback = [&](bool) {
-                    context.interface<Processing::AdvancedFileInterface>({ .index = 1 })->keepRect({0.2, 0.2, 0.4, 0.4});
-                    m_SpectralViewer->reGenerateImage(true);
-                },
-                .graphics = T.reverse
-            });
-
-            add<Button>({
-                248, 8, 20, 20
-            }, {
-                .callback = [&](bool) {
-                    context.interface<Processing::AdvancedFileInterface>({.index = 1 })->moveRect({0.2, 0.2, 0.4, 0.4}, { 0.2, 0.1 });
-                    m_SpectralViewer->reGenerateImage(true);
-                },
-                .graphics = T.reverse
-            });
         }
             
         // ------------------------------------------------
             
-        m_NonAudioLoadPopupView = &add<NonAudioLoadPopupView>({
+        nonAudioLoadPopupView = &add<NonAudioLoadPopupView>({
             4, 32, Width - 8, Height - 36 
         });
             
-        m_NotificationPopupView = &add<NotificationPopupView>({
+        notificationPopupView = &add<NotificationPopupView>({
             4, 32, Width - 8, Height - 36 
         });
 
@@ -145,23 +171,18 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    bool SpectralFileViewer::isInterestedInFileDrag(const StringArray& files) {
-        if (settings.file->modifyingFile()) return false; // cannot drop when file is being modified
-        return files.size() == 1/* && (files[0].endsWith(".wav") || files[0].endsWith(".mp3"))*/;
+    void SpectralFileViewer::tryingToOpenFile() {
+        m_SpectralViewer->fileWillProbablyChangeSoon();
     }
 
-    void SpectralFileViewer::filesDropped(const StringArray& files, int x, int y) {
-        if (isInterestedInFileDrag(files)) {
-            std::filesystem::path path = files[0].toStdString();
-            if (path.extension() == ".mp3" || path.extension() == ".wav") {
-                m_FileLoadFuture = settings.file->openFile(path);
-                m_SpectralViewer->fileWillProbablyChangeSoon();
-            } else {
-                m_NonAudioLoadPopupView->open([&, path](std::size_t bitDepth, double sampleRate) {
-                    m_FileLoadFuture = settings.file->openFile(path, bitDepth, sampleRate);
-                    m_SpectralViewer->fileWillProbablyChangeSoon();
-                });
+    void SpectralFileViewer::fileOpened(FileLoadStatus status) {
+        if (status == FileLoadStatus::Success) {
+            m_SpectralViewer->reGenerateImage(true);
+            if (settings.childView) {
+                settings.childView->m_SpectralViewer->reGenerateImage(true);
             }
+        } else {
+            m_SpectralViewer->fileDidNotChange();
         }
     }
 
@@ -185,36 +206,7 @@ namespace Kaixo::Gui {
             m_SpectralViewer->reGenerateImage(true);
         }
 
-        if (m_FileLoadFuture.valid() && m_FileLoadFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-            constexpr auto errorMessage = [](FileLoadStatus status) {
-                switch (status) {
-                case FileLoadStatus::Error:
-                    return "An error occurred while opening the file";
-                    break;      
-                case FileLoadStatus::FailedToOpen:
-                    return "Failed to open file";
-                    break;
-                case FileLoadStatus::NotExists:
-                    return "File does not exist";
-                    break;     
-                case FileLoadStatus::TooLarge:
-                    return "File is too large";
-                    break;
-                }
-            };
-
-            auto status = m_FileLoadFuture.get();
-            m_FileLoadFuture = {};
-            if (status == FileLoadStatus::Success) {
-                m_SpectralViewer->reGenerateImage(true);
-                if (settings.childView) {
-                    settings.childView->m_SpectralViewer->reGenerateImage(true);
-                }
-            } else {
-                m_NotificationPopupView->open(errorMessage(status));
-                m_SpectralViewer->fileDidNotChange();
-            }
-        }
+        FileDropTarget::onIdle();
     }
 
     // ------------------------------------------------

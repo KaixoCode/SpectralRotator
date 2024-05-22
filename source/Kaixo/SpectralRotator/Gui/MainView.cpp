@@ -13,7 +13,7 @@
 
 #include "Kaixo/SpectralRotator/Gui/SpectralFileViewer.hpp"
 #include "Kaixo/SpectralRotator/Gui/SettingsView.hpp"
-#include "Kaixo/SpectralRotator/Gui/AdvancedFileView.hpp"
+#include "Kaixo/SpectralRotator/Gui/EditorView.hpp"
 
 // ------------------------------------------------
 
@@ -85,7 +85,7 @@ namespace Kaixo::Gui {
         
         // ------------------------------------------------
         
-        auto& advanced = add<AdvancedFileView>({ 32, 4, Width - 36, Height - 8 }, {});
+        auto& advanced = add<EditorView>({ 32, 4, Width - 36, Height - 8 }, {});
 
         // ------------------------------------------------
         

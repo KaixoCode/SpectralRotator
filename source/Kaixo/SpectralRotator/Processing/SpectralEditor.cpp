@@ -1,7 +1,7 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Processing/AdvancedSpectralEditor.hpp"
+#include "Kaixo/SpectralRotator/Processing/SpectralEditor.hpp"
 
 // ------------------------------------------------
 
@@ -9,7 +9,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void AdvancedSpectralEditor::process() {
+    void SpectralEditor::process() {
         readingFile = true;
 
         // Do not read file while modifying. The modifying functions will
@@ -39,7 +39,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void AdvancedSpectralEditor::playPause() {
+    void SpectralEditor::playPause() {
         if (playing) {
             playing = false;
         } else {
@@ -47,25 +47,25 @@ namespace Kaixo::Processing {
         }
     }
 
-    void AdvancedSpectralEditor::seek(float position) {
+    void SpectralEditor::seek(float position) {
         seekPosition = position * size();
     }
 
-    float AdvancedSpectralEditor::position() {
+    float SpectralEditor::position() {
         if (size() == 0) return 0;
         return static_cast<float>(seekPosition) / size();
     }
 
     // ------------------------------------------------
 
-    void AdvancedSpectralEditor::waitForReadingToFinish() {
+    void SpectralEditor::waitForReadingToFinish() {
         // Simple spin to wait for the audio thread to finish reading from the file
         while (readingFile) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
 
-    FileLoadStatus AdvancedSpectralEditor::open(std::filesystem::path path, std::size_t bitDepth, double sampleRate) {
+    FileLoadStatus SpectralEditor::open(std::filesystem::path path, std::size_t bitDepth, double sampleRate) {
         std::lock_guard lock{ fileMutex };
 
         modifyingFile = true;
@@ -78,7 +78,7 @@ namespace Kaixo::Processing {
         return result;
     }
 
-    float AdvancedSpectralEditor::loadingProgress() {
+    float SpectralEditor::loadingProgress() {
         if (modifyingFile) {
             return 0;
         }
@@ -88,7 +88,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    Processing::AudioBuffer AdvancedSpectralEditor::combined() {
+    Processing::AudioBuffer SpectralEditor::combined() {
         AudioBuffer result;
         result.resize(size());
 
@@ -103,7 +103,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    std::size_t AdvancedSpectralEditor::size() {
+    std::size_t SpectralEditor::size() {
         std::size_t size = 0;
         for (auto& [id, layer] : layers) {
             if (size < layer.delay + layer.buffer.size()) size = layer.delay + layer.buffer.size();
@@ -113,7 +113,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    void AdvancedSpectralEditor::finalizeEdit() {
+    void SpectralEditor::finalizeEdit() {
         if (editing.buffer.empty()) return; // Not editing = nothing to finalize
 
         auto denorm = denormalizeRect(selection);
@@ -186,7 +186,7 @@ namespace Kaixo::Processing {
         editing.delay = 0;
     }
 
-    void AdvancedSpectralEditor::cut() {
+    void SpectralEditor::cut() {
         clipboardSelection = selection;
 
         // Editing buffer empty = take selection from selected layer
@@ -266,7 +266,7 @@ namespace Kaixo::Processing {
         selection = { 0, 0, 0, 0 }; // Clear selection
     }
 
-    void AdvancedSpectralEditor::remove() {
+    void SpectralEditor::remove() {
         auto denorm = denormalizeRect(selection);
 
         // Not editing = remove from selected layer
@@ -320,7 +320,7 @@ namespace Kaixo::Processing {
         selection = { 0, 0, 0, 0 }; // Clear selection
     }
 
-    void AdvancedSpectralEditor::copy() {
+    void SpectralEditor::copy() {
         clipboardSelection = selection;
 
         // If editing, we can copy to clipboard directly, and then
@@ -378,19 +378,19 @@ namespace Kaixo::Processing {
         selection = { 0, 0, 0, 0 }; // Clear selection
     }
 
-    void AdvancedSpectralEditor::paste() {
+    void SpectralEditor::paste() {
         finalizeEdit(); // Finalize any current editing before paste
         editing = clipboard; // Copy clipboard to editing layer
 
         selection = clipboardSelection; // And recover clipboard selection
     }
 
-    void AdvancedSpectralEditor::select(Rect<float> rect) { 
+    void SpectralEditor::select(Rect<float> rect) { 
         finalizeEdit(); // Different select = editing becomes invalid
         selection = rect; 
     }
 
-    void AdvancedSpectralEditor::move(Point<float> amount) {
+    void SpectralEditor::move(Point<float> amount) {
         if (selection.isEmpty()) return;
 
         selection += amount;
@@ -442,7 +442,7 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
     
-    Rect<std::int64_t> AdvancedSpectralEditor::denormalizeRect(Rect<float> rect) {
+    Rect<std::int64_t> SpectralEditor::denormalizeRect(Rect<float> rect) {
         std::int64_t sampleStart = rect.x() * bufferSampleRate;
         std::int64_t fftSize = rect.width() * bufferSampleRate;
         std::int64_t frequencyResolution = fftSize / 2;

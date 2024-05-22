@@ -13,6 +13,9 @@
 // ------------------------------------------------
 
 #include "Kaixo/Utils/AudioFile.hpp"
+#include "Kaixo/SpectralRotator/Gui/SpectralViewer.hpp"
+#include "Kaixo/SpectralRotator/Gui/SpectralFileViewer.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/EditorInterface.hpp"
 
 // ------------------------------------------------
 
@@ -20,7 +23,7 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
     
-    class AdvancedFileLayer : public View {
+    class EditorViewLayer : public View {
     public:
 
         // ------------------------------------------------
@@ -37,11 +40,7 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
-        AdvancedFileLayer(Context c, Settings s)
-            : View(c), settings(std::move(s)) 
-        {
-            add<ImageView>({ .image = T.button });
-        }
+        EditorViewLayer(Context c, Settings s);
 
         // ------------------------------------------------
 
@@ -51,12 +50,42 @@ namespace Kaixo::Gui {
     
     class SpectralEditor : public View {
     public: 
+    
+        // ------------------------------------------------
+
+        struct Settings {
+
+            // ------------------------------------------------
+            
+            Processing::InterfaceStorage<Processing::EditorInterface> editor;
+
+            // ------------------------------------------------
+
+        } settings;
+
+        // ------------------------------------------------
+
+        SpectralEditor(Context c, Settings s);
+
+        // ------------------------------------------------
+        
+        void mouseDown(const juce::MouseEvent& event) override;
+        void mouseUp(const juce::MouseEvent& event) override;
+        void mouseDrag(const juce::MouseEvent& event) override;
+
+        // ------------------------------------------------
+        
+        enum class State {
+            Selecting, Moving
+        } state = State::Selecting;
+
+        // ------------------------------------------------
 
     };
 
     // ------------------------------------------------
     
-    class AdvancedFileView : public View {
+    class EditorView : public View, public FileDropTarget {
     public:
 
         // ------------------------------------------------
@@ -69,53 +98,22 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        AdvancedFileView(Context c, Settings s)
-            : View(c), settings(std::move(s))
-        {
+        EditorView(Context c, Settings s);
 
-            // ------------------------------------------------
-            
-            add<ImageView>({ .image = T.settings.background });
+        // ------------------------------------------------
 
-            // ------------------------------------------------
-
-            m_LayersScrollView = &add<ScrollView>({ Width - 74, 4, 70, Height - 8 }, {
-                .scrollbar = T.advanced.scrollbar
-            });
-
-            // ------------------------------------------------
-            
-            add<SpectralViewer>({ 4, 32, Width - 78, Height - 36 }, {
-                .file = context.interface<Processing::FileInterface>({ .index = 2 })
-            });
-
-            // ------------------------------------------------
-            
-            addLayer();
-            addLayer();
-            addLayer();
-            addLayer();
-            addLayer();
-            addLayer();
-            addLayer();
-
-            // ------------------------------------------------
-
-        }
+        void tryingToOpenFile() override;
+        void fileOpened(FileLoadStatus status) override;
 
         // ------------------------------------------------
         
     private:
-        std::vector<AdvancedFileLayer*> m_Layers{};
+        std::vector<EditorViewLayer*> m_Layers{};
         ScrollView* m_LayersScrollView;
 
         // ------------------------------------------------
         
-        void addLayer() {
-            m_LayersScrollView->add<AdvancedFileLayer>({ Width, 50 }, {
-                .index = 1
-            });
-        }
+        void addLayer();
 
         // ------------------------------------------------
 

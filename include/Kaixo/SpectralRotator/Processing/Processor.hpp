@@ -11,7 +11,7 @@
 #include "Kaixo/SpectralRotator/Controller.hpp"
 #include "Kaixo/SpectralRotator/Processing/Rotator.hpp"
 #include "Kaixo/SpectralRotator/Processing/FileHandler.hpp"
-#include "Kaixo/SpectralRotator/Processing/AdvancedSpectralEditor.hpp"
+#include "Kaixo/SpectralRotator/Processing/SpectralEditor.hpp"
 #include "Kaixo/SpectralRotator/Processing/Utils/Resampler.hpp"
 
 // ------------------------------------------------
@@ -36,7 +36,7 @@ namespace Kaixo::Processing {
         FileHandler inputFile{}; // Input audio
         FileHandler rotatedFile{}; // Rotated audio
 
-        AdvancedSpectralEditor editor{};
+        SpectralEditor editor{};
 
         // ------------------------------------------------
 

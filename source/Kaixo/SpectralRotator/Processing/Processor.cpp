@@ -6,7 +6,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/SpectralRotator/Processing/Interfaces/FileInterface.hpp"
-#include "Kaixo/SpectralRotator/Processing/Interfaces/AdvancedFileInterface.hpp"
+#include "Kaixo/SpectralRotator/Processing/Interfaces/EditorInterface.hpp"
 
 // ------------------------------------------------
 
@@ -19,7 +19,7 @@ namespace Kaixo::Processing {
         registerModule(rotatedFile);
 
         registerInterface<FileInterface>();
-        registerInterface<AdvancedFileInterface>();
+        registerInterface<EditorInterface>();
     }
 
     // ------------------------------------------------
@@ -28,8 +28,9 @@ namespace Kaixo::Processing {
         for (std::size_t i = 0; i < outputBuffer().size(); ++i) {
             inputFile.process();
             rotatedFile.process();
+            editor.process();
 
-            outputBuffer()[i] = inputFile.output + rotatedFile.output;
+            outputBuffer()[i] = inputFile.output + rotatedFile.output + editor.output;
         }
     }
 

@@ -22,7 +22,48 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
     
-    class SpectralFileViewer : public View, public FileDragAndDropTarget {
+    class FileDropTarget : public FileDragAndDropTarget {
+    public:
+
+        // ------------------------------------------------
+        
+        FileDropTarget(Processing::InterfaceStorage<Processing::FileInterface> file);
+
+        // ------------------------------------------------
+        
+        Processing::InterfaceStorage<Processing::FileInterface> file;
+
+        // ------------------------------------------------
+
+        bool isInterestedInFileDrag(const StringArray& files) override;
+        void filesDropped(const StringArray& files, int x, int y) override;
+
+        // ------------------------------------------------
+        
+        virtual void tryingToOpenFile() = 0;
+        virtual void fileOpened(FileLoadStatus status) = 0;
+
+        // ------------------------------------------------
+        
+        void onIdle();
+
+        // ------------------------------------------------
+
+        NonAudioLoadPopupView* nonAudioLoadPopupView = nullptr;
+        NotificationPopupView* notificationPopupView = nullptr;
+
+        // ------------------------------------------------
+
+    private:
+        std::future<FileLoadStatus> m_FileLoadFuture{};
+
+        // ------------------------------------------------
+
+    };
+
+    // ------------------------------------------------
+    
+    class SpectralFileViewer : public View, public FileDropTarget {
     public:
 
         // ------------------------------------------------
@@ -46,11 +87,11 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        bool isInterestedInFileDrag(const StringArray& files) override;
-        void filesDropped(const StringArray& files, int x, int y) override;
+        void tryingToOpenFile() override;
+        void fileOpened(FileLoadStatus status) override;
 
         // ------------------------------------------------
-        
+
         bool keyPressed(const juce::KeyPress& event);
 
         // ------------------------------------------------
@@ -65,12 +106,7 @@ namespace Kaixo::Gui {
         
     private:
         SpectralViewer* m_SpectralViewer;
-
-        NonAudioLoadPopupView* m_NonAudioLoadPopupView;
-        NotificationPopupView* m_NotificationPopupView;
-
         std::future<void> m_RotateFuture{};
-        std::future<FileLoadStatus> m_FileLoadFuture{};
         
         // ------------------------------------------------
 
