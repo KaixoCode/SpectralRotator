@@ -120,7 +120,7 @@ namespace Kaixo::Gui {
             .format = Formatters::Group<"5 ms", "10 ms", "25 ms", "50 ms", "75 ms", "100 ms">,
             .transform = Transformers::Group<6>,
             .resetValue = 2.f / 5.f
-        }).value(Math::clamp(Storage::getOrDefault<int>("fft-block-size", 6), 0, 8) / 8.f);
+        }).value(Math::clamp(Storage::getOrDefault<int>("fft-block-size", 2), 0, 5) / 5.f);
         
         add<Knob>({ 4, 32 + (y++) * 24, Width - 8, 22 }, {
             .onchange = [&](ParamValue val) {

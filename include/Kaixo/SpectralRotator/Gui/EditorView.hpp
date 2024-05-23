@@ -75,9 +75,33 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
+        void paintOverChildren(juce::Graphics& g) override;
+        
+        // ------------------------------------------------
+        
+        void onIdle() override;
+
+        // ------------------------------------------------
+        
         enum class State {
-            Selecting, Moving
+            Waiting, Selecting, Moving, Child
         } state = State::Selecting;
+
+        // ------------------------------------------------
+        
+        SpectralViewer* spectralViewer;
+
+        // ------------------------------------------------
+        
+        Point<float> dragStart;
+        Point<float> dragEnd;
+        Point<float> moved;
+
+        Rect<> selectedRect();
+
+        // ------------------------------------------------
+        
+        std::future<void> editFuture;
 
         // ------------------------------------------------
 
@@ -106,7 +130,23 @@ namespace Kaixo::Gui {
         void fileOpened(FileLoadStatus status) override;
 
         // ------------------------------------------------
+
+        bool keyPressed(const juce::KeyPress& event);
+
+        // ------------------------------------------------
         
+        void onIdle() override;
+
+        // ------------------------------------------------
+        
+        SpectralViewer& spectralViewer() { return *spectralEditor->spectralViewer; }
+
+        // ------------------------------------------------
+        
+        SpectralEditor* spectralEditor;
+
+        // ------------------------------------------------
+
     private:
         std::vector<EditorViewLayer*> m_Layers{};
         ScrollView* m_LayersScrollView;

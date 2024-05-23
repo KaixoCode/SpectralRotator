@@ -53,22 +53,40 @@ namespace Kaixo::Gui {
         
         // ------------------------------------------------
         
+        auto& advanced = add<EditorView>({ 32, 4, Width - 36, Height - 8 }, {});
+
+        // ------------------------------------------------
+        
+        add<Button>({ 4, 289, 20, 20 }, {
+            .callback = [&](bool) {
+                advanced.setVisible(!advanced.isVisible());
+                m_ResizedCallback();
+            },
+            .graphics = T.button
+        });
+
+        // ------------------------------------------------
+        
         auto& settings = add<SettingsView>({
             .fftSizeChanged = [&](int fftSize) {
                 input.spectralViewer().fftSize(fftSize);
                 rotated.spectralViewer().fftSize(fftSize);
+                advanced.spectralViewer().fftSize(fftSize);
             },
             .fftResolutionChanged = [&](int value) {
                 input.spectralViewer().fftResolution(value);
                 rotated.spectralViewer().fftResolution(value);
+                advanced.spectralViewer().fftResolution(value);
             },            
             .fftBlockSizeChanged = [&](int value) {
                 input.spectralViewer().fftBlockSize(value);
                 rotated.spectralViewer().fftBlockSize(value);
+                advanced.spectralViewer().fftBlockSize(value);
             },
             .fftDbDepthChanged = [&](float value) {
                 input.spectralViewer().fftRange(value);
                 rotated.spectralViewer().fftRange(value);
+                advanced.spectralViewer().fftRange(value);
             }
         });
         settings.setVisible(false);
@@ -83,20 +101,6 @@ namespace Kaixo::Gui {
             .graphics = T.settings.button
         });
         
-        // ------------------------------------------------
-        
-        auto& advanced = add<EditorView>({ 32, 4, Width - 36, Height - 8 }, {});
-
-        // ------------------------------------------------
-        
-        add<Button>({ 4, 289, 20, 20 }, {
-            .callback = [&](bool) {
-                advanced.setVisible(!advanced.isVisible());
-                m_ResizedCallback();
-            },
-            .graphics = T.button
-        });
-
         // ------------------------------------------------
         
         m_ResizedCallback = [&] {
@@ -114,12 +118,14 @@ namespace Kaixo::Gui {
             case DefaultUI: {
                 rotated.dimensions(UnevaluatedRect{ 32, 8 + (Height - 12) / 2, Width - 36, (Height - 12) / 2 });
                 input.dimensions(UnevaluatedRect{ 32, 4, Width - 36, (Height - 12) / 2 });
+                advanced.dimensions(UnevaluatedRect{ 32, 4, Width - 36, Height - 12 });
                 settings.dimensions(UnevaluatedRect{ 32, 4, Width - 36, Height - 8 });
                 break;
             }
             case SettingsOnTheSideUI: {
                 rotated.dimensions(UnevaluatedRect{ 32, 8 + (Height - 12) / 2, Width - 340, (Height - 12) / 2 });
                 input.dimensions(UnevaluatedRect{ 32, 4, Width - 340, (Height - 12) / 2 });
+                advanced.dimensions(UnevaluatedRect{ 32, 4, Width - 340, Height - 12 });
                 settings.dimensions(UnevaluatedRect{ Width - 304, 4, 300, Height - 8 });
                 break;
             }
@@ -127,6 +133,7 @@ namespace Kaixo::Gui {
 
             rotated.updateDimensions();
             input.updateDimensions();
+            advanced.updateDimensions();
             settings.updateDimensions();
         };
 

@@ -90,7 +90,12 @@ namespace Kaixo::Processing {
 
     Processing::AudioBuffer SpectralEditor::combined() {
         AudioBuffer result;
+        result.sampleRate = bufferSampleRate;
         result.resize(size());
+
+        for (std::size_t i = 0; i < editing.buffer.size(); ++i) {
+            result[i + editing.delay] += editing.buffer[i];
+        }
 
         for (auto& [id, layer] : layers) {
             for (std::size_t i = 0; i < layer.buffer.size(); ++i) {
@@ -104,11 +109,19 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     std::size_t SpectralEditor::size() {
-        std::size_t size = 0;
+        std::size_t size = editing.buffer.size();
         for (auto& [id, layer] : layers) {
             if (size < layer.delay + layer.buffer.size()) size = layer.delay + layer.buffer.size();
         }
         return size;
+    }
+
+    float SpectralEditor::length() {
+        return size() / bufferSampleRate;
+    }
+    
+    float SpectralEditor::nyquist() {
+        return bufferSampleRate / 2;
     }
 
     // ------------------------------------------------
@@ -118,68 +131,14 @@ namespace Kaixo::Processing {
 
         auto denorm = denormalizeRect(selection);
 
-        std::int64_t sampleStart = denorm.x();
-        std::int64_t binStart = denorm.y();
-        std::int64_t fftSize = denorm.width(); 
-        std::int64_t bins = denorm.height();
-
-        auto& from = editing;
-        auto& to = layers[selectedLayer];
-
-        ComplexBuffer selected{};
-        ComplexBuffer added{};
-        selected.resize(fftSize);
-        added.resize(fftSize);
-        for (std::int64_t i = 0; i < fftSize; ++i) {
-            std::int64_t fromIndex = i + sampleStart - from.delay;
-            if (fromIndex >= 0 && fromIndex < from.buffer.size()) {
-                selected.l[i] = from.buffer[fromIndex].l;
-                selected.r[i] = from.buffer[fromIndex].r;
-            }
-
-            std::int64_t toIndex = i + sampleStart - to.delay;
-            if (toIndex >= 0 && toIndex < to.buffer.size()) {
-                added.l[i] = to.buffer[toIndex].l;
-                added.r[i] = to.buffer[toIndex].r;
-            }
-        }
-
-        Fft{}.transform(selected.l, false);
-        Fft{}.transform(selected.r, false);
-        Fft{}.transform(added.l, false);
-        Fft{}.transform(added.r, false);
-
-        for (std::size_t i = 0; i < fftSize / 2; ++i) {
-            if (i >= binStart && i < binStart + bins) {
-                added.l[i] = selected.l[i];
-                added.r[i] = selected.r[i];
-                if (i != 0) {
-                    added.l[fftSize - i] = selected.l[i];
-                    added.r[fftSize - i] = selected.r[i];
-                }
-            }
-        }
-
-        Fft{}.transform(added.l, true);
-        Fft{}.transform(added.r, true);
-
-        // Trying to insert in a layer before its buffer, resize to fit
-        if (sampleStart < to.delay) {
-            std::size_t shortage = to.delay - sampleStart;
-            AudioBuffer newBuffer;
-            newBuffer.resize(to.buffer.size() + shortage);
-            std::memcpy(newBuffer.data() + shortage, to.buffer.data(), to.buffer.size() * sizeof(AudioFrame));
-            to.buffer = std::move(newBuffer);
-            to.delay -= shortage;
-        }
-
-        for (std::size_t i = 0; i < fftSize; ++i) {
-            std::int64_t index = i + sampleStart - to.delay;
-            if (index >= 0 && index < to.buffer.size()) {
-                to.buffer[i].l = added.l[i].real() / fftSize;
-                to.buffer[i].r = added.r[i].real() / fftSize;
-            }
-        }
+        doOperation({
+            .source = &editing,
+            .selection = selection,
+            .destination = &layers[selectedLayer],
+            .clearDestination = false,
+            .destinationPosition = selection.position(),
+            .op = Operation::Copy
+        });
 
         // Clear editing layer
         editing.buffer.clear();
@@ -191,72 +150,14 @@ namespace Kaixo::Processing {
 
         // Editing buffer empty = take selection from selected layer
         if (editing.buffer.empty()) {
-            auto denorm = denormalizeRect(selection);
-
-            std::int64_t sampleStart = denorm.x();
-            std::int64_t binStart = denorm.y();
-            std::int64_t fftSize = denorm.width(); 
-            std::int64_t bins = denorm.height();
-
-            auto& from = layers[selectedLayer];
-            auto& to = clipboard;
-
-            ComplexBuffer selected{};
-            selected.resize(fftSize);
-            for (std::int64_t i = 0; i < fftSize; ++i) {
-                std::int64_t index = i + sampleStart - from.delay;
-                if (index >= 0 && index < from.buffer.size()) {
-                    selected.l[i] = from.buffer[index].l;
-                    selected.r[i] = from.buffer[index].r;
-                }
-            }
-
-            Fft{}.transform(selected.l, false);
-            Fft{}.transform(selected.r, false);
-
-            ComplexBuffer removed{};
-            removed.resize(fftSize);
-            std::memcpy(removed.l.data(), selected.l.data(), fftSize * sizeof(std::complex<float>));
-            std::memcpy(removed.r.data(), selected.r.data(), fftSize * sizeof(std::complex<float>));
-            for (std::size_t i = 0; i < fftSize / 2; ++i) {
-                if (i >= binStart && i < binStart + bins) {
-                    removed.l[i] = { 0, 0 };
-                    removed.r[i] = { 0, 0 };
-                    if (i != 0) {
-                        removed.l[fftSize - i] = { 0, 0 };
-                        removed.r[fftSize - i] = { 0, 0 };
-                    }
-                } else {
-                    selected.l[i] = { 0, 0 };
-                    selected.r[i] = { 0, 0 };
-                    if (i != 0) {
-                        selected.l[fftSize - i] = { 0, 0 };
-                        selected.r[fftSize - i] = { 0, 0 };
-                    }
-                }
-            }
-
-            Fft{}.transform(removed.l, true);
-            Fft{}.transform(removed.r, true);
-            Fft{}.transform(selected.l, true);
-            Fft{}.transform(selected.r, true);
-
-            to.delay = sampleStart;
-            to.buffer.clear();
-            to.buffer.resize(fftSize);
-            for (std::size_t i = 0; i < fftSize; ++i) {
-                to.buffer[i].l = selected.l[i].real() / fftSize;
-                to.buffer[i].r = selected.r[i].real() / fftSize;
-            }
-            
-            for (std::size_t i = 0; i < fftSize; ++i) {
-                std::int64_t index = i + sampleStart - from.delay;
-                if (index >= 0 && index < from.buffer.size()) {
-                    from.buffer[i].l = removed.l[i].real() / fftSize;
-                    from.buffer[i].r = removed.r[i].real() / fftSize;
-                }
-            }
-
+            doOperation({
+                .source = &layers[selectedLayer],
+                .selection = selection,
+                .destination = &clipboard,
+                .clearDestination = true,
+                .destinationPosition = selection.position(),
+                .op = Operation::Move
+            });
         } else { // Otherwise just move editing layer to clipboard
             clipboard = std::move(editing);
             editing.buffer.clear();
@@ -271,47 +172,11 @@ namespace Kaixo::Processing {
 
         // Not editing = remove from selected layer
         if (editing.buffer.empty()) {
-            std::int64_t sampleStart = denorm.x();
-            std::int64_t binStart = denorm.y();
-            std::int64_t fftSize = denorm.width();
-            std::int64_t bins = denorm.height();
-
-            auto& from = layers[selectedLayer];
-
-            ComplexBuffer removed{};
-            removed.resize(fftSize);
-            for (std::int64_t i = 0; i < fftSize; ++i) {
-                std::int64_t index = i + sampleStart - from.delay;
-                if (index >= 0 && index < from.buffer.size()) {
-                    removed.l[i] = from.buffer[index].l;
-                    removed.r[i] = from.buffer[index].r;
-                }
-            }
-
-            Fft{}.transform(removed.l, false);
-            Fft{}.transform(removed.r, false);
-
-            for (std::size_t i = 0; i < fftSize / 2; ++i) {
-                if (i >= binStart && i < binStart + bins) {
-                    removed.l[i] = { 0, 0 };
-                    removed.r[i] = { 0, 0 };
-                    if (i != 0) {
-                        removed.l[fftSize - i] = { 0, 0 };
-                        removed.r[fftSize - i] = { 0, 0 };
-                    }
-                }
-            }
-
-            Fft{}.transform(removed.l, true);
-            Fft{}.transform(removed.r, true);
-
-            for (std::size_t i = 0; i < fftSize; ++i) {
-                std::int64_t index = i + sampleStart - from.delay;
-                if (index >= 0 && index < from.buffer.size()) {
-                    from.buffer[i].l = removed.l[i].real() / fftSize;
-                    from.buffer[i].r = removed.r[i].real() / fftSize;
-                }
-            }
+            doOperation({
+                .source = &layers[selectedLayer],
+                .selection = selection,
+                .op = Operation::Remove
+            });
         } else { // else just remove editing 
             editing.buffer.clear();
             editing.delay = 0;
@@ -329,50 +194,14 @@ namespace Kaixo::Processing {
             clipboard = editing;
             finalizeEdit();
         } else { // Otherwise take directly from selected layer
-            auto denorm = denormalizeRect(selection);
-
-            std::int64_t sampleStart = denorm.x();
-            std::int64_t binStart = denorm.y();
-            std::int64_t fftSize = denorm.width();
-            std::int64_t bins = denorm.height();
-
-            auto& from = layers[selectedLayer];
-            auto& to = clipboard;
-
-            ComplexBuffer selected{};
-            selected.resize(fftSize);
-            for (std::int64_t i = 0; i < fftSize; ++i) {
-                std::int64_t index = i + sampleStart - from.delay;
-                if (index >= 0 && index < from.buffer.size()) {
-                    selected.l[i] = from.buffer[index].l;
-                    selected.r[i] = from.buffer[index].r;
-                }
-            }
-
-            Fft{}.transform(selected.l, false);
-            Fft{}.transform(selected.r, false);
-
-            for (std::size_t i = 0; i < fftSize / 2; ++i) {
-                if (i < binStart || i >= binStart + bins) {
-                    selected.l[i] = { 0, 0 };
-                    selected.r[i] = { 0, 0 };
-                    if (i != 0) {
-                        selected.l[fftSize - i] = { 0, 0 };
-                        selected.r[fftSize - i] = { 0, 0 };
-                    }
-                }
-            }
-
-            Fft{}.transform(selected.l, true);
-            Fft{}.transform(selected.r, true);
-
-            to.delay = sampleStart;
-            to.buffer.clear();
-            to.buffer.resize(fftSize);
-            for (std::size_t i = 0; i < fftSize; ++i) {
-                to.buffer[i].l = selected.l[i].real() / fftSize;
-                to.buffer[i].r = selected.r[i].real() / fftSize;
-            }
+            doOperation({
+                .source = &layers[selectedLayer],
+                .selection = selection,
+                .destination = &clipboard,
+                .clearDestination = true,
+                .destinationPosition = selection.position(),
+                .op = Operation::Copy
+            });
         }
         
         selection = { 0, 0, 0, 0 }; // Clear selection
@@ -393,51 +222,28 @@ namespace Kaixo::Processing {
     void SpectralEditor::move(Point<float> amount) {
         if (selection.isEmpty()) return;
 
-        selection += amount;
-
         // Not editing, cut and paste to editing layer
         if (editing.buffer.empty()) {
-            cut();
-            paste();
+            doOperation({
+                .source = &layers[selectedLayer],
+                .selection = selection,
+                .destination = &editing,
+                .clearDestination = true,
+                .destinationPosition = selection.position(),
+                .op = Operation::Move
+            });
         }
-
+        
+        std::int64_t fftSize = editing.buffer.size();
+        std::int64_t binShift = fftSize * amount.y() / bufferSampleRate;
         editing.delay += amount.x() * bufferSampleRate;
+        ComplexBuffer buffer;
+        buffer.resize(fftSize);
+        toFrequencyDomain(editing, buffer, editing.delay);
+        frequencyShift(buffer, binShift);
+        toTimeDomain(editing, buffer, editing.delay);
 
-        std::int64_t fftSize = selection.width() * bufferSampleRate;
-        std::int64_t frequencyResolution = fftSize / 2;
-        float nyquist = bufferSampleRate / 2;
-        std::int64_t binShift = frequencyResolution * amount.y() / nyquist;
-
-        if (binShift == 0) return; // No shifting
-
-        auto& from = editing;
-
-        ComplexBuffer shifted{};
-        shifted.resize(fftSize);
-        for (std::int64_t i = 0; i < fftSize; ++i) {
-            std::int64_t index = i - from.delay;
-            if (index >= 0 && index < from.buffer.size()) {
-                shifted.l[i] = from.buffer[index].l;
-                shifted.r[i] = from.buffer[index].r;
-            }
-        }
-
-        Fft{}.transform(shifted.l, false);
-        Fft{}.transform(shifted.r, false);
-
-        // Shift positive frequency bins, and then set negative ones to 0
-        std::memmove(shifted.l.data(), shifted.l.data() + binShift, (fftSize / 2) * sizeof(std::complex<float>));
-        std::memset(shifted.l.data() + fftSize / 2, 0, (fftSize / 2) + sizeof(std::complex<float>));
-
-        // TODO: check if assymetry messes with level
-
-        Fft{}.transform(shifted.l, true);
-        Fft{}.transform(shifted.r, true);
-
-        for (std::size_t i = 0; i < fftSize; ++i) {
-            from.buffer[i].l = shifted.l[i].real() / fftSize;
-            from.buffer[i].r = shifted.r[i].real() / fftSize;
-        }
+        selection += amount;
     }
 
     // ------------------------------------------------
@@ -445,11 +251,213 @@ namespace Kaixo::Processing {
     Rect<std::int64_t> SpectralEditor::denormalizeRect(Rect<float> rect) {
         std::int64_t sampleStart = rect.x() * bufferSampleRate;
         std::int64_t fftSize = rect.width() * bufferSampleRate;
-        std::int64_t frequencyResolution = fftSize / 2;
-        float nyquist = bufferSampleRate / 2;
-        std::int64_t binStart = frequencyResolution * rect.y() / nyquist;
-        std::int64_t binWidth = frequencyResolution * rect.height() / nyquist;
+        std::int64_t binStart = fftSize * rect.y() / bufferSampleRate;
+        std::int64_t binWidth = fftSize * rect.height() / bufferSampleRate;
         return { sampleStart, binStart, fftSize, binWidth };
+    }
+
+    // ------------------------------------------------
+
+    void SpectralEditor::frequencyShift(ComplexBuffer& buffer, std::int64_t bins) {
+        const auto fftSize = buffer.size();
+        // Offset the to account for destination offset
+        if (bins > 0) {
+            std::memmove(buffer.l.data() + bins, buffer.l.data(), (fftSize / 2 - bins) * sizeof(std::complex<float>));
+            std::memmove(buffer.r.data() + bins, buffer.r.data(), (fftSize / 2 - bins) * sizeof(std::complex<float>));
+            std::memmove(buffer.l.data() + fftSize / 2, buffer.l.data() + fftSize / 2 + bins, (fftSize / 2 - bins) * sizeof(std::complex<float>));
+            std::memmove(buffer.r.data() + fftSize / 2, buffer.r.data() + fftSize / 2 + bins, (fftSize / 2 - bins) * sizeof(std::complex<float>));
+        } else if (bins < 0) {
+            std::memmove(buffer.l.data(), buffer.l.data() - bins, (fftSize / 2 + bins) * sizeof(std::complex<float>));
+            std::memmove(buffer.r.data(), buffer.r.data() - bins, (fftSize / 2 + bins) * sizeof(std::complex<float>));
+            std::memmove(buffer.l.data() + fftSize / 2 - bins, buffer.l.data() + fftSize / 2, (fftSize / 2 + bins) * sizeof(std::complex<float>));
+            std::memmove(buffer.r.data() + fftSize / 2 - bins, buffer.r.data() + fftSize / 2, (fftSize / 2 + bins) * sizeof(std::complex<float>));
+        }
+    }
+
+    void SpectralEditor::toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::size_t timeOffset) {
+        for (std::int64_t i = 0; i < destination.size(); ++i) {
+            std::int64_t index = i + timeOffset - layer.delay;
+            if (index >= 0 && index < layer.buffer.size()) {
+                destination.l[i] = layer.buffer[index].l;
+                destination.r[i] = layer.buffer[index].r;
+            }
+        }
+
+        Fft{}.transform(destination.l, false);
+        Fft{}.transform(destination.r, false);
+    }
+
+    void SpectralEditor::toTimeDomain(Layer& layer, ComplexBuffer& source, std::size_t timeOffset) {
+        Fft{}.transform(source.l, true);
+        Fft{}.transform(source.r, true);
+
+        for (std::size_t i = 0; i < source.size(); ++i) {
+            std::int64_t index = i + timeOffset - layer.delay;
+            if (index >= 0 && index < layer.buffer.size()) {
+                layer.buffer[index].l = source.l[i].real() / source.size();
+                layer.buffer[index].r = source.r[i].real() / source.size();
+            }
+        }
+    }
+
+    void SpectralEditor::doOperation(Operation operation) {
+
+        // ------------------------------------------------
+
+        if (operation.source == nullptr) return;
+        if (operation.selection.isEmpty()) return;
+
+        // ------------------------------------------------
+
+        bool removeFromSource = operation.op == Operation::Remove
+                             || operation.op == Operation::Move;
+
+        // ------------------------------------------------
+
+        auto denorm = denormalizeRect(operation.selection);
+        std::int64_t sampleStart = denorm.x();
+        std::int64_t binStart = denorm.y();
+        std::int64_t fftSize = denorm.width(); 
+        std::int64_t bins = denorm.height();
+
+        // ------------------------------------------------
+
+        auto& source = *operation.source;
+        ComplexBuffer sourceBuffer{};
+        sourceBuffer.resize(fftSize);
+        toFrequencyDomain(source, sourceBuffer, sampleStart);
+
+        // ------------------------------------------------
+
+        if (removeFromSource) {
+            // If we're doing operations on a destination layer, we need to make a copy
+            // of our current frequency-domain data.
+            ComplexBuffer removed{};
+            if (operation.destination != nullptr) {
+                removed.resize(fftSize);
+                std::memcpy(removed.l.data(), sourceBuffer.l.data(), fftSize * sizeof(std::complex<float>));
+                std::memcpy(removed.r.data(), sourceBuffer.r.data(), fftSize * sizeof(std::complex<float>));
+            }
+
+            ComplexBuffer& buffer = operation.destination == nullptr ? sourceBuffer : removed;
+
+            for (std::size_t i = 0; i < fftSize / 2; ++i) {
+                if (i >= binStart && i < binStart + bins) {
+                    buffer.l[i] = { 0, 0 };
+                    buffer.r[i] = { 0, 0 };
+                    if (i != 0) {
+                        buffer.l[fftSize - i] = { 0, 0 };
+                        buffer.r[fftSize - i] = { 0, 0 };
+                    }
+                }
+            }
+
+            toTimeDomain(source, buffer, sampleStart);
+        }
+
+        // ------------------------------------------------
+
+        // At this point, if there's no destination, we're done.
+        if (operation.destination == nullptr) return;
+
+        // ------------------------------------------------
+
+        auto& destination = *operation.destination;
+
+        // ------------------------------------------------
+        
+        float destinationPosXNorm = operation.destinationPosition.x();
+        float destinationPosYNorm = operation.destinationPosition.y();
+
+        std::int64_t destinationSampleStart = destinationPosXNorm * bufferSampleRate;
+        std::int64_t destinationBinStart = (2 * destinationPosYNorm / bufferSampleRate) * (fftSize / 2);
+        std::int64_t destinationBinOffset = destinationBinStart - binStart;
+        
+        // ------------------------------------------------
+
+        if (operation.clearDestination) {
+            
+            // ------------------------------------------------
+
+            // This removes everything but the selection from sourceBuffer
+            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
+                if (i < binStart || i >= binStart + bins) {
+                    sourceBuffer.l[i] = { 0, 0 };
+                    sourceBuffer.r[i] = { 0, 0 };
+                    if (i != 0) {
+                        sourceBuffer.l[fftSize - i] = { 0, 0 };
+                        sourceBuffer.r[fftSize - i] = { 0, 0 };
+                    }
+                }
+            }
+
+            // ------------------------------------------------
+
+            frequencyShift(sourceBuffer, destinationBinOffset);
+
+            // ------------------------------------------------
+
+            Fft{}.transform(sourceBuffer.l, true);
+            Fft{}.transform(sourceBuffer.r, true);
+
+            // ------------------------------------------------
+
+            destination.delay = destinationSampleStart;
+            destination.buffer.clear();
+            destination.buffer.resize(fftSize);
+            for (std::int64_t i = 0; i < fftSize; ++i) {
+                destination.buffer[i].l = sourceBuffer.l[i].real() / fftSize;
+                destination.buffer[i].r = sourceBuffer.r[i].real() / fftSize;
+            }
+
+            // ------------------------------------------------
+
+        } else {
+
+            // ------------------------------------------------
+
+            // Trying to insert in a layer before its buffer, resize to fit
+            if (destinationSampleStart < destination.delay) {
+                std::size_t shortage = destination.delay - destinationSampleStart;
+                AudioBuffer newBuffer;
+                newBuffer.resize(destination.buffer.size() + shortage);
+                std::memcpy(newBuffer.data() + shortage, destination.buffer.data(), destination.buffer.size() * sizeof(AudioFrame));
+                destination.buffer = std::move(newBuffer);
+                destination.delay = destinationSampleStart;
+            }
+
+            // ------------------------------------------------
+
+            ComplexBuffer destinationBuffer{};
+            destinationBuffer.resize(fftSize);
+            toFrequencyDomain(destination, destinationBuffer, destinationSampleStart);
+
+            // ------------------------------------------------
+
+            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
+                std::int64_t destI = i + destinationBinOffset;
+                if (i >= binStart && i < binStart + bins && 
+                    destI >= 0 && destI <= fftSize / 2) 
+                {
+                    destinationBuffer.l[destI] = sourceBuffer.l[i];
+                    destinationBuffer.r[destI] = sourceBuffer.r[i];
+                    if (i != 0) {
+                        destinationBuffer.l[fftSize - destI] = sourceBuffer.l[fftSize - i];
+                        destinationBuffer.r[fftSize - destI] = sourceBuffer.r[fftSize - i];
+                    }
+                }
+            }
+
+            // ------------------------------------------------
+            
+            toTimeDomain(destination, destinationBuffer, destinationSampleStart);
+
+            // ------------------------------------------------
+
+        }
+
+        // ------------------------------------------------
+
     }
 
     // ------------------------------------------------

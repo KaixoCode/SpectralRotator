@@ -62,6 +62,11 @@ namespace Kaixo::Processing {
             processor.editor.move(amount);
         });
     }
+    
+    Rect<float> EditorInterface::selection() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.editor.selection;
+    }
 
     // ------------------------------------------------
 

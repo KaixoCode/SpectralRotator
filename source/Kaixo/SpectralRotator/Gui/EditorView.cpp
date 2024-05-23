@@ -5,6 +5,10 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/Core/Gui/Button.hpp"
+
+// ------------------------------------------------
+
 namespace Kaixo::Gui {
 
     // ------------------------------------------------
@@ -20,23 +24,116 @@ namespace Kaixo::Gui {
     SpectralEditor::SpectralEditor(Context c, Settings s) 
         : View(c), settings(std::move(s)) 
     {
-        add<SpectralViewer>({
+        wantsIdle(true);
+
+        spectralViewer = &add<SpectralViewer>({
             .file = context.interface<Processing::FileInterface>({.index = 2 })
         });
+
+        spectralViewer->setInterceptsMouseClicks(false, false);
     }
 
     // ------------------------------------------------
     
     void SpectralEditor::mouseDown(const juce::MouseEvent& event) {
-        
+        Point<> mouse{ event.x, event.y };
+
+        if (event.mods.isCtrlDown()) {
+            if (editFuture.valid()) {
+                state = State::Waiting;
+            } else if (selectedRect().contains(mouse)) {
+                state = State::Moving;
+                moved = { 0, 0 };
+            } else {
+                state = State::Selecting;
+                dragStart = spectralViewer->normalizePosition({ event.x, event.y });
+                dragEnd = dragStart;
+                moved = { 0, 0 };
+            }
+        } else {
+            state = State::Child;
+            spectralViewer->mouseDown(event.getEventRelativeTo(spectralViewer));
+        }
     }
 
     void SpectralEditor::mouseUp(const juce::MouseEvent& event) {
-        
+        switch (state) {
+        case State::Selecting: {
+            Point<float> begin = dragStart;
+            Point<float> end = dragEnd;
+            auto minX = Math::min(end.x(), begin.x());
+            auto maxX = Math::max(end.x(), begin.x());
+            auto minY = Math::min(end.y(), begin.y());
+            auto maxY = Math::max(end.y(), begin.y());
+            editFuture = settings.editor->select({ minX, minY, maxX - minX, maxY - minY });
+            break;
+        }
+        case State::Moving:
+            editFuture = settings.editor->move(moved);
+            dragStart += moved;
+            dragEnd += moved;
+            moved = { 0, 0 };
+            break;
+        case State::Child:
+            spectralViewer->mouseUp(event.getEventRelativeTo(spectralViewer));
+            break;
+        }
+
     }
 
     void SpectralEditor::mouseDrag(const juce::MouseEvent& event) {
-        
+        Point<Coord> added{
+            event.getDistanceFromDragStartX(),
+            event.getDistanceFromDragStartY(),
+        };
+
+        switch (state) {
+        case State::Selecting:
+            dragEnd = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added);
+            break;
+        case State::Moving:
+            moved = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added) - dragStart;
+            break;
+        case State::Child:
+            spectralViewer->mouseDrag(event.getEventRelativeTo(spectralViewer));
+            break;
+        }
+
+        repaint();
+    }
+
+    // ------------------------------------------------
+
+    void SpectralEditor::paintOverChildren(juce::Graphics& g) {
+        auto rect = selectedRect();
+        g.setColour(Color{ 255, 255, 255, 40 });
+        g.fillRect(rect);
+        g.setColour(Color{ 255, 255, 255, 255 });
+        g.drawRect(rect, 1);
+    }
+
+    void SpectralEditor::onIdle() {
+        View::onIdle();
+        if (editFuture.valid() && editFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            editFuture = {};
+
+            auto newSelect = settings.editor->selection();
+            dragStart = newSelect.position();
+            dragEnd = newSelect.position() + newSelect.size();
+            spectralViewer->reGenerateImage(true);
+        }
+    }
+
+    Rect<> SpectralEditor::selectedRect() {
+        Point<float> begin = dragStart + moved;
+        Point<float> end = dragEnd + moved;
+        auto beginPosition = spectralViewer->denormalizePosition(begin);
+        auto endPosition = spectralViewer->denormalizePosition(end);
+        auto minX = Math::min(endPosition.x(), beginPosition.x());
+        auto maxX = Math::max(endPosition.x(), beginPosition.x());
+        auto minY = Math::min(endPosition.y(), beginPosition.y());
+        auto maxY = Math::max(endPosition.y(), beginPosition.y());
+        return Rect<>{ minX, minY, maxX - minX, maxY - minY };
     }
 
     // ------------------------------------------------
@@ -46,6 +143,10 @@ namespace Kaixo::Gui {
           FileDropTarget(c.interface<Processing::FileInterface>({ .index = 2 })), 
           settings(std::move(s))
     {
+
+        // ------------------------------------------------
+        
+        wantsIdle(true);
 
         // ------------------------------------------------
 
@@ -59,11 +160,35 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        add<SpectralViewer>({ 4, 32, Width - 78, Height - 36 }, {
-            .file = context.interface<Processing::FileInterface>({.index = 2 })
+        spectralEditor = &add<SpectralEditor>({ 4, 32, Width - 78, Height - 36 }, {
+            .editor = context.interface<Processing::EditorInterface>()
         });
 
-        add<SpectralEditor>({ 4, 32, Width - 78, Height - 36 }, {
+        // ------------------------------------------------
+        
+        add<Button>({ 100, 4, 20, 20 }, {
+            .callback = [&](bool) {
+                spectralEditor->editFuture = spectralEditor->settings.editor->cut();
+            },
+            .graphics = T.button    
+        });
+        
+        // ------------------------------------------------
+        
+        add<Button>({ 130, 4, 20, 20 }, {
+            .callback = [&](bool) {
+                spectralEditor->editFuture = spectralEditor->settings.editor->copy();
+            },
+            .graphics = T.button    
+        });
+        
+        // ------------------------------------------------
+        
+        add<Button>({ 160, 4, 20, 20 }, {
+            .callback = [&](bool) {
+                spectralEditor->editFuture = spectralEditor->settings.editor->paste();
+            },
+            .graphics = T.button    
         });
 
         // ------------------------------------------------
@@ -82,14 +207,45 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
     
-    void EditorView::tryingToOpenFile() {
+    void EditorView::onIdle() {
+        View::onIdle();
+        FileDropTarget::onIdle();
+    }
 
+    // ------------------------------------------------
+    
+    void EditorView::tryingToOpenFile() {
+        spectralEditor->spectralViewer->fileWillProbablyChangeSoon();
     }
 
     void EditorView::fileOpened(FileLoadStatus status) {
-
+        if (status == FileLoadStatus::Success) {
+            spectralEditor->spectralViewer->reGenerateImage(true);
+        } else {
+            spectralEditor->spectralViewer->fileDidNotChange();
+        }
     }
 
+    // ------------------------------------------------
+
+    bool EditorView::keyPressed(const juce::KeyPress& event) {
+        if (event.getKeyCode() == event.spaceKey) {
+            context.interface<Processing::FileInterface>({ .index = 2 })->playPause();
+            return true;
+        }
+
+        if (event.getModifiers().isCtrlDown()) {
+            if (event.getKeyCode() == 'c') {
+                spectralEditor->editFuture = spectralEditor->settings.editor->copy();
+            } else if (event.getKeyCode() == 'v') {
+                spectralEditor->editFuture = spectralEditor->settings.editor->paste();
+            } else if (event.getKeyCode() == 'x') {
+                spectralEditor->editFuture = spectralEditor->settings.editor->cut();
+            }
+        }
+
+        return false;
+    }
 
     // ------------------------------------------------
 

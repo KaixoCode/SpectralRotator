@@ -216,6 +216,40 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
+    Point<float> SpectralViewer::normalizePosition(Point<> coord) {
+        float normX = static_cast<float>(coord.x()) / width();
+        float normY = 1 - static_cast<float>(coord.y()) / height();
+
+        float timeStart = 0;
+        float timeEnd = settings.file->length();
+
+        float frequencyStart = 0;
+        float frequencyEnd = settings.file->nyquist();
+
+        float x = normX * (timeEnd - timeStart) + timeStart;
+        float y = normY * (frequencyEnd - frequencyStart) + frequencyStart;
+
+        return { x, y };
+    }
+
+    Point<> SpectralViewer::denormalizePosition(Point<float> normal) {
+        float timeStart = 0;
+        float timeEnd = settings.file->length();
+
+        float frequencyStart = 0;
+        float frequencyEnd = settings.file->nyquist();
+
+        float normX = (normal.x() - timeStart) / (timeEnd - timeStart);
+        float normY = (normal.y() - frequencyStart) / (frequencyEnd - frequencyStart);
+
+        float x = normX * width();
+        float y = (1 - normY) * height();
+
+        return { x, y };
+    }
+
+    // ------------------------------------------------
+
 }
 
 // ------------------------------------------------

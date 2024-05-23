@@ -114,6 +114,30 @@ namespace Kaixo::Processing {
         return 0;
     }
 
+    float FileInterface::length() {
+        auto& processor = self<SpectralRotatorProcessor>();
+
+        switch (settings.index) {
+        case 0: return processor.inputFile.length();
+        case 1: return processor.rotatedFile.length();
+        case 2: return processor.editor.length();
+        }
+
+        return 0;
+    }
+    
+    float FileInterface::nyquist() {
+        auto& processor = self<SpectralRotatorProcessor>();
+
+        switch (settings.index) {
+        case 0: return processor.inputFile.nyquist();
+        case 1: return processor.rotatedFile.nyquist();
+        case 2: return processor.editor.nyquist();
+        }
+
+        return 1;
+    }
+
     std::filesystem::path FileInterface::path() {
         auto& processor = self<SpectralRotatorProcessor>();
 

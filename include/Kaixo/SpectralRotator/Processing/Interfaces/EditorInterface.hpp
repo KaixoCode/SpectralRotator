@@ -39,6 +39,8 @@ namespace Kaixo::Processing {
         std::future<void> select(Rect<float> rect);
         std::future<void> move(Point<float> amount);
 
+        Rect<float> selection();
+
         // ------------------------------------------------
 
         cxxpool::thread_pool asyncTaskPool{ 1 };

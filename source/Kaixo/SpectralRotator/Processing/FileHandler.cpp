@@ -127,9 +127,17 @@ namespace Kaixo::Processing {
 
         return 1;
     }
+    
+    float FileHandler::length() {
+        return file() ? file()->buffer.size() / file()->buffer.sampleRate : 0;
+    }
+    
+    float FileHandler::nyquist() {
+        return file() ? file()->buffer.sampleRate / 2 : 1;
+    }
 
     // ------------------------------------------------
-
+    
     std::size_t FileHandler::size() {
         if (auto curFile = file()) return curFile->buffer.size();
         return 0;

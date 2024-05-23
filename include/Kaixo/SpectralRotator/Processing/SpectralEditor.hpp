@@ -47,6 +47,8 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         std::size_t size();
+        float length(); // length in seconds
+        float nyquist(); // length in seconds
 
         // ------------------------------------------------
         
@@ -78,6 +80,33 @@ namespace Kaixo::Processing {
         Layer editing{};
         Layer clipboard{};
         Rect<float> clipboardSelection{}; // Original selection when moved to clipboard
+
+        // ------------------------------------------------
+
+        struct Operation {
+            // Source layer
+            Layer* source = nullptr;
+            // Selection in source
+            Rect<float> selection{ 0, 0, 0, 0 };
+            // Destination layer
+            Layer* destination = nullptr;
+            // Allowed to completely overwrite destination
+            bool clearDestination = true; 
+            // Position in destination to put it
+            Point<float> destinationPosition = selection.position();
+            // Operation to perform
+            enum { 
+                Move,  // Remove from source, overwrite in destination
+                Copy,  // Keep in source, and overwrite in destination
+                Remove // Remove from source, destination is unused
+            } op;
+        };
+
+        void frequencyShift(ComplexBuffer& buffer, std::int64_t bins);
+        void toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::size_t timeOffset);
+        void toTimeDomain(Layer& layer, ComplexBuffer& source, std::size_t timeOffset);
+
+        void doOperation(Operation operation);
 
         // ------------------------------------------------
 

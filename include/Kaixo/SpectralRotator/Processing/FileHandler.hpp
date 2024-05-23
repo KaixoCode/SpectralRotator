@@ -43,6 +43,9 @@ namespace Kaixo::Processing {
 
         float loadingProgress();
 
+        float length(); // length of file in seconds
+        float nyquist(); 
+
         // ------------------------------------------------
 
         std::size_t size();

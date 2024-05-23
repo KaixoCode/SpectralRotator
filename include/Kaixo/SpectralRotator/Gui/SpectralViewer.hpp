@@ -72,6 +72,11 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
+        Point<float> normalizePosition(Point<> coord);
+        Point<> denormalizePosition(Point<float> normal);
+
+        // ------------------------------------------------
+        
     private:
         mutable std::mutex m_AnalyzeResultMutex{};
         juce::Image m_Image = juce::Image(juce::Image::PixelFormat::ARGB, 512, 256, true);
