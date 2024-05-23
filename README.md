@@ -6,7 +6,7 @@ SpectralRotator is a VST plugin that can rotate the frequency spectrum of any so
 ## Installation Guide
 Installing this VST is very straightforward. Go to the [Releases](https://github.com/KaixoCode/SpectralRotator/releases) tab, select the latest release, and simply download the VST3 file. You then put this VST3 file into your VST3 folder, it is usually located somewhere like `C:\Program Files\Common Files\VST3`.
 
-Unfortunately I do not have access to an iOS device to compile it for Mac, so **there is currently only a Windows version available**.
+Unfortunately, I do not have access to a Mac OS device to compile it for Mac, so **there is currently only a Windows version available**.
 
 ## How To Use The Plugin
 When you open the plugin you are faced with two simple samplers: *source* and *rotate*. Start by dropping a sample into the *source* sampler, this will load the sample in both *source* and *rotate*. You can then press the buttons on the *rotate* sampler to rotate the frequency spectrum into any orientation. Once you've rotated the sample, you can drag the result back into your DAW by hovering over the "rotate" text and dragging.
