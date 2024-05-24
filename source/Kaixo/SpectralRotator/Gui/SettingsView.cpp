@@ -90,7 +90,7 @@ namespace Kaixo::Gui {
         
         add<Knob>({ 4, 32 + (y++) * 24, Width - 8, 22 }, {
             .onchange = [&](ParamValue val) {
-                constexpr int fftSizes[]{ 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
+                constexpr int fftSizes[]{ 1, 2, 4, 8, 16, 32, 64, 128, 256 };
                 int index = Math::clamp(normalToIndex(val, 9), 0, 8);
                 Storage::set<int>("fft-resolution", index);
                 settings.fftResolutionChanged(fftSizes[index]);
@@ -100,10 +100,10 @@ namespace Kaixo::Gui {
             .tooltipValue = false,
             .name = "FFT Resolution",
             .steps = 9,
-            .format = Formatters::Group<"32", "64", "128", "256", "512", "1024", "2048", "4096", "8192">,
+            .format = Formatters::Group<"0.25ms", "0.5ms", "1ms", "2ms", "4ms", "8ms", "16ms", "32ms", "64ms">,
             .transform = Transformers::Group<9>,
-            .resetValue = 5.f / 8.f
-        }).value(Math::clamp(Storage::getOrDefault<int>("fft-resolution", 6), 0, 8) / 8.f);
+            .resetValue = 2.f / 8.f
+        }).value(Math::clamp(Storage::getOrDefault<int>("fft-resolution", 2), 0, 8) / 8.f);
         
         add<Knob>({ 4, 32 + (y++) * 24, Width - 8, 22 }, {
             .onchange = [&](ParamValue val) {

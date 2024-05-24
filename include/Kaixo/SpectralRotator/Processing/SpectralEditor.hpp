@@ -65,6 +65,7 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
         
         Rect<std::int64_t> denormalizeRect(Rect<float> rect);
+        Rect<float> normalizeRect(Rect<std::int64_t> rect);
 
         // ------------------------------------------------
         

@@ -57,9 +57,11 @@ namespace Kaixo::Gui {
         void mouseDown(const juce::MouseEvent& event) override;
         void mouseDrag(const juce::MouseEvent& event) override;
 
+        void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
+
         // ------------------------------------------------
         
-        void reGenerateImage(bool withAnalyze);
+        void reGenerateImage(bool withAnalyze, bool inBackground = false);
         void fileWillProbablyChangeSoon() { m_FileWillProbablyChange = true; };
         void fileDidNotChange() { m_FileWillProbablyChange = false; };
 
@@ -75,6 +77,13 @@ namespace Kaixo::Gui {
         Point<float> normalizePosition(Point<float> coord);
         Point<float> denormalizePosition(Point<float> normal);
 
+        Point<float> normalizePositionRelative(Point<float> coord, Rect<float> selection);
+        Point<float> denormalizePositionRelative(Point<float> normal, Rect<float> selection);
+
+        // ------------------------------------------------
+        
+        void select(Rect<float> rect, bool regen = true);
+
         // ------------------------------------------------
         
     private:
@@ -82,8 +91,12 @@ namespace Kaixo::Gui {
         juce::Image m_Image = juce::Image(juce::Image::PixelFormat::ARGB, 512, 256, true);
         juce::Image m_Generated = juce::Image(juce::Image::PixelFormat::ARGB, 512, 256, true);
 
+        Rect<float> m_Selection{ 0, 10, 10, 48000 };
+        Rect<float> m_SelectionWhenStartedGenerating{ 0, 10, 10, 48000 };
+        Rect<float> m_ImageSelection{ 0, 10, 10, 48000 };
+        Rect<float> m_SelectionWhenStartedDragging{ 0, 10, 10, 48000 };
         std::size_t m_FFTSize = 2048;
-        std::size_t m_FFTResolution = 2048;
+        float m_FFTResolution = 1;
         std::size_t m_FFTBlockSize = 50;
         float m_FFTRange = 48;
         std::size_t m_AnalyzingProgress = 0;
@@ -91,9 +104,8 @@ namespace Kaixo::Gui {
         bool m_ShowingProgress = false;
         bool m_DidResize = false;
         std::atomic_bool m_NewImageReady = false;
-        std::atomic_bool m_TryingToAssignNewImage = false;
         std::atomic_bool m_GeneratingImage = false;
-        std::atomic_bool m_CausedByResize = false;
+        std::atomic_bool m_AnalyzeInBackground = false;
         std::atomic_bool m_ShouldAnalyze = false;
         std::atomic_bool m_FileWillProbablyChange = false;
         Processing::AudioBufferSpectralInformation m_AnalyzeResult;

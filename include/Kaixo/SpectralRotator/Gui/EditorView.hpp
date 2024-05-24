@@ -74,6 +74,10 @@ namespace Kaixo::Gui {
         void mouseDrag(const juce::MouseEvent& event) override;
 
         // ------------------------------------------------
+
+        void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel);
+
+        // ------------------------------------------------
         
         void paintOverChildren(juce::Graphics& g) override;
         

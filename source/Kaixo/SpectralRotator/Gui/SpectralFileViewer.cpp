@@ -177,8 +177,16 @@ namespace Kaixo::Gui {
 
     void SpectralFileViewer::fileOpened(FileLoadStatus status) {
         if (status == FileLoadStatus::Success) {
+            Rect<float> selection = {
+                0,
+                0,
+                m_SpectralViewer->settings.file->length(),
+                m_SpectralViewer->settings.file->nyquist(),
+            };
+            m_SpectralViewer->select(selection, false);
             m_SpectralViewer->reGenerateImage(true);
             if (settings.childView) {
+                settings.childView->m_SpectralViewer->select(selection, false);
                 settings.childView->m_SpectralViewer->reGenerateImage(true);
             }
         } else {

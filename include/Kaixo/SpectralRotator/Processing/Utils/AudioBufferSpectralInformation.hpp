@@ -38,11 +38,11 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            float intensityAtY(std::int64_t x, float y, float dy);
+            float intensityAtY(std::int64_t x, float y);
 
             // ------------------------------------------------
 
-            float intensityAt(float x, float dx, float y, float dy);
+            float intensityAt(float x, float y);
 
             // ------------------------------------------------
 
@@ -54,13 +54,13 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        float intensityAt(float x, float dx, float y, float dy);
+        float intensityAt(float x, float y);
 
         // ------------------------------------------------
         
         static AudioBufferSpectralInformation analyze(
             const Processing::AudioBuffer& buffer, std::size_t fftSize, 
-            std::size_t horizontalResolution, std::size_t blockSize, std::size_t* progress);
+            float horizontalResolution, std::size_t blockSize, std::size_t* progress);
 
         // ------------------------------------------------
 

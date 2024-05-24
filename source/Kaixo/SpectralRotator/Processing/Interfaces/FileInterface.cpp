@@ -150,7 +150,7 @@ namespace Kaixo::Processing {
     }
 
     AudioBufferSpectralInformation FileInterface::analyzeBuffer(
-        std::size_t fftSize, std::size_t horizontalResolution, std::size_t blockSize, std::size_t* progress) 
+        std::size_t fftSize, float horizontalResolution, std::size_t blockSize, std::size_t* progress) 
     {
         auto& processor = self<SpectralRotatorProcessor>();
 

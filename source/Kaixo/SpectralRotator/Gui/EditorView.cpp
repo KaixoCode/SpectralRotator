@@ -38,7 +38,7 @@ namespace Kaixo::Gui {
     void SpectralEditor::mouseDown(const juce::MouseEvent& event) {
         Point<> mouse{ event.x, event.y };
 
-        if (event.mods.isCtrlDown()) {
+        if (event.mods.isCtrlDown() || event.mods.isMiddleButtonDown()) {
             state = State::Child;
             spectralViewer->mouseDown(event.getEventRelativeTo(spectralViewer));
         } else {
@@ -104,6 +104,12 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
+    void SpectralEditor::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) {
+        spectralViewer->mouseWheelMove(event, wheel);
+    }
+
+    // ------------------------------------------------
+
     void SpectralEditor::paintOverChildren(juce::Graphics& g) {
         auto rect = selectedRect();
         g.setColour(Color{ 255, 255, 255, 40 });
@@ -120,7 +126,7 @@ namespace Kaixo::Gui {
             auto newSelect = settings.editor->selection();
             dragStart = newSelect.position();
             dragEnd = newSelect.position() + newSelect.size();
-            spectralViewer->reGenerateImage(true);
+            spectralViewer->reGenerateImage(true, true);
         }
     }
 
@@ -193,6 +199,16 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
+        nonAudioLoadPopupView = &add<NonAudioLoadPopupView>({
+            4, 32, Width - 78, Height - 36
+        });
+
+        notificationPopupView = &add<NotificationPopupView>({
+            4, 32, Width - 78, Height - 36
+        });
+
+        // ------------------------------------------------
+
         addLayer();
         addLayer();
         addLayer();
@@ -220,6 +236,12 @@ namespace Kaixo::Gui {
 
     void EditorView::fileOpened(FileLoadStatus status) {
         if (status == FileLoadStatus::Success) {
+            spectralEditor->spectralViewer->select({
+                0, 
+                10,  
+                spectralEditor->spectralViewer->settings.file->length(),
+                spectralEditor->spectralViewer->settings.file->nyquist(),
+            }, false);
             spectralEditor->spectralViewer->reGenerateImage(true);
         } else {
             spectralEditor->spectralViewer->fileDidNotChange();
@@ -234,13 +256,21 @@ namespace Kaixo::Gui {
             return true;
         }
 
+        if (event.getKeyCode() == event.deleteKey) {
+            spectralEditor->editFuture = spectralEditor->settings.editor->remove();
+            return true;
+        }
+
         if (event.getModifiers().isCtrlDown()) {
             if (event.getKeyCode() == 'C') {
                 spectralEditor->editFuture = spectralEditor->settings.editor->copy();
+                return true;
             } else if (event.getKeyCode() == 'V') {
                 spectralEditor->editFuture = spectralEditor->settings.editor->paste();
+                return true;
             } else if (event.getKeyCode() == 'X') {
                 spectralEditor->editFuture = spectralEditor->settings.editor->cut();
+                return true;
             }
         }
 

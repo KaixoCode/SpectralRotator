@@ -133,10 +133,6 @@ namespace Kaixo::Processing {
     void SpectralEditor::finalizeEdit() {
         if (editing.buffer.empty()) return; // Not editing = nothing to finalize
 
-        modifyingFile = true;
-        waitForReadingToFinish();
-        start();
-
         Operation operation = {
             .source = &editing,
             .selection = selection,
@@ -152,11 +148,11 @@ namespace Kaixo::Processing {
         // Clear editing layer
         editing.buffer.clear();
         editing.delay = 0;
-
-        modifyingFile = false;
     }
 
     void SpectralEditor::cut() {
+        std::lock_guard lock{ fileMutex };
+
         modifyingFile = true;
         waitForReadingToFinish();
         start();
@@ -188,6 +184,8 @@ namespace Kaixo::Processing {
     }
 
     void SpectralEditor::remove() {
+        std::lock_guard lock{ fileMutex };
+
         modifyingFile = true;
         waitForReadingToFinish();
         start();
@@ -215,6 +213,8 @@ namespace Kaixo::Processing {
     }
 
     void SpectralEditor::copy() {
+        std::lock_guard lock{ fileMutex };
+
         modifyingFile = true;
         waitForReadingToFinish();
         start();
@@ -246,6 +246,8 @@ namespace Kaixo::Processing {
     }
 
     void SpectralEditor::paste() {
+        std::lock_guard lock{ fileMutex };
+
         modifyingFile = true;
         waitForReadingToFinish();
         start();
@@ -259,12 +261,15 @@ namespace Kaixo::Processing {
     }
 
     void SpectralEditor::select(Rect<float> rect) {
+        std::lock_guard lock{ fileMutex };
+
         modifyingFile = true;
         waitForReadingToFinish();
         start();
 
         finalizeEdit(); // Different select = editing becomes invalid
-        selection = rect;
+        // Snap to samples/fft bins
+        selection = normalizeRect(denormalizeRect(rect));
 
         modifyingFile = false;
     }
@@ -276,6 +281,8 @@ namespace Kaixo::Processing {
         if (selection.isEmpty()) return;
 
         // ------------------------------------------------
+
+        std::lock_guard lock{ fileMutex };
 
         modifyingFile = true;
         waitForReadingToFinish();
@@ -309,6 +316,19 @@ namespace Kaixo::Processing {
             estimatedSteps += estimateOperationSteps(operation);
 
             doOperation(operation);
+        } else if (!remove) { // editing buffer has content, but move, means 
+            Operation operation{
+                .source = &editing,
+                .selection = selection,
+                .destination = &layers[selectedLayer],
+                .clearDestination = false,
+                .destinationPosition = selection.position(),
+                .op = Operation::Copy
+            };
+
+            estimatedSteps += estimateOperationSteps(operation);
+
+            doOperation(operation);
         }
         
         std::int64_t fftSize = editing.buffer.size();
@@ -333,6 +353,14 @@ namespace Kaixo::Processing {
         std::int64_t binStart = fftSize * rect.y() / bufferSampleRate;
         std::int64_t binWidth = fftSize * rect.height() / bufferSampleRate;
         return { sampleStart, binStart, fftSize, binWidth };
+    }
+    
+    Rect<float> SpectralEditor::normalizeRect(Rect<std::int64_t> rect) {
+        float timeStart = rect.x() / bufferSampleRate;
+        float timeWidth = rect.width() / bufferSampleRate;
+        float freqStart = rect.y() * bufferSampleRate / rect.width();
+        float freqWidth = rect.height() * bufferSampleRate / rect.width();
+        return { timeStart, freqStart, timeWidth, freqWidth };
     }
 
     // ------------------------------------------------
@@ -426,7 +454,7 @@ namespace Kaixo::Processing {
 
             ComplexBuffer& buffer = operation.destination == nullptr ? sourceBuffer : removed;
 
-            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
+            for (std::int64_t i = 0; i < fftSize / 2 + 1; ++i) {
                 if (i >= binStart && i < binStart + bins) {
                     buffer.l[i] = { 0, 0 };
                     buffer.r[i] = { 0, 0 };
@@ -467,7 +495,7 @@ namespace Kaixo::Processing {
             // ------------------------------------------------
 
             // This removes everything but the selection from sourceBuffer
-            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
+            for (std::int64_t i = 0; i < fftSize / 2 + 1; ++i) {
                 if (i < binStart || i >= binStart + bins) {
                     sourceBuffer.l[i] = { 0, 0 };
                     sourceBuffer.r[i] = { 0, 0 };
@@ -534,7 +562,7 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
+            for (std::int64_t i = 0; i < fftSize / 2 + 1; ++i) {
                 std::int64_t destI = i + destinationBinOffset;
                 if (i >= binStart && i < binStart + bins && 
                     destI >= 0 && destI <= fftSize / 2) 
