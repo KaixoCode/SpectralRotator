@@ -72,7 +72,10 @@ namespace Kaixo::Processing {
         FileLoadStatus result = file.open(path, bitDepth, sampleRate);
         if (result == FileLoadStatus::Success) {
             layers[selectedLayer].delay = 0;
+            layers[selectedLayer].offset = 0;
             layers[selectedLayer].buffer = std::move(file.buffer);
+            layers[selectedLayer].dirtyStart = 0;
+            layers[selectedLayer].dirtyEnd = std::numeric_limits<float>::max();
         }
         modifyingFile = false;
         return result;
