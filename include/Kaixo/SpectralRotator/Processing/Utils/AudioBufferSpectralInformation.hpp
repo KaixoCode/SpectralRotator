@@ -27,6 +27,7 @@ namespace Kaixo::Processing {
 
             float sampleRate = 1;
             Rect<float> selection{};
+            Point<float> offset{};
             std::size_t frameSize = 1024;
             std::vector<float> intensity{};
 

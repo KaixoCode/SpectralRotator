@@ -56,8 +56,8 @@ namespace Kaixo::Processing {
                 x < layer.selection.x() + layer.selection.width() &&
                 y < layer.selection.y() + layer.selection.height()) 
             {
-                float normX = (x - layer.selection.x()) / layer.selection.width();
-                float normY = 2 * y / layer.sampleRate;
+                float normX = (x - layer.offset.x()) / layer.selection.width();
+                float normY = 2 * (y - layer.offset.y()) / layer.sampleRate;
                 intensity = layer.intensityAt(normX, normY);
                 break;
             }
@@ -90,6 +90,7 @@ namespace Kaixo::Processing {
         auto& result = spectralInformation.layers.emplace_back();
         result.frameSize = fftSize / 2 + 1;
         result.intensity.resize(result.frameSize * blocks);
+        result.offset = { 0.f, 0.f };
         result.selection = { 0.f, 0.f, buffer.size() / buffer.sampleRate, buffer.sampleRate / 2 };
         result.sampleRate = buffer.sampleRate;
         // ^^ Default selection is entire buffer

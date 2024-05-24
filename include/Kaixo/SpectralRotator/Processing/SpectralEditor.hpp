@@ -77,6 +77,7 @@ namespace Kaixo::Processing {
         struct Layer {
             Processing::AudioBuffer buffer{};
             std::int64_t delay = 0; // samples
+            float offset = 0; // frequency offset in Hz
         };
 
         std::map<std::size_t, Layer> layers;

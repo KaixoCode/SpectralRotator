@@ -148,6 +148,7 @@ namespace Kaixo::Processing {
         // Clear editing layer
         editing.buffer.clear();
         editing.delay = 0;
+        editing.offset = 0;
     }
 
     void SpectralEditor::cut() {
@@ -175,7 +176,8 @@ namespace Kaixo::Processing {
         } else { // Otherwise just move editing layer to clipboard
             clipboard = std::move(editing);
             editing.buffer.clear();
-            editing.delay = editing.delay;
+            editing.delay = 0;
+            editing.offset = 0;
         }
 
         selection = { 0, 0, 0, 0 }; // Clear selection
@@ -205,6 +207,7 @@ namespace Kaixo::Processing {
         } else { // else just remove editing 
             editing.buffer.clear();
             editing.delay = 0;
+            editing.offset = 0;
         }
 
         selection = { 0, 0, 0, 0 }; // Clear selection
@@ -295,10 +298,10 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        estimatedSteps =
-            estimateToFrequencyDomainSteps(editing, fftSizeEstimate, editing.delay) +
-            estimateFrequencyShiftSteps(fftSizeEstimate, 1) +
-            estimateToTimeDomainSteps(editing, fftSizeEstimate, editing.delay);
+        estimatedSteps = 0;
+            //estimateToFrequencyDomainSteps(editing, fftSizeEstimate, editing.delay) +
+            //estimateFrequencyShiftSteps(fftSizeEstimate, 1) +
+            //estimateToTimeDomainSteps(editing, fftSizeEstimate, editing.delay);
 
         // ------------------------------------------------
 
@@ -334,11 +337,12 @@ namespace Kaixo::Processing {
         std::int64_t fftSize = editing.buffer.size();
         std::int64_t binShift = fftSize * amount.y() / bufferSampleRate;
         editing.delay += amount.x() * bufferSampleRate;
-        ComplexBuffer buffer;
-        buffer.resize(fftSize);
-        toFrequencyDomain(editing, buffer, editing.delay);
-        frequencyShift(buffer, binShift);
-        toTimeDomain(editing, buffer, editing.delay);
+        editing.offset += amount.y();
+        //ComplexBuffer buffer;
+        //buffer.resize(fftSize);
+        //toFrequencyDomain(editing, buffer, editing.delay);
+        //frequencyShift(buffer, binShift);
+        //toTimeDomain(editing, buffer, editing.delay);
 
         selection += amount;
 
@@ -427,7 +431,14 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        auto denorm = denormalizeRect(operation.selection);
+        Rect<float> selection{
+            operation.selection.x(),
+            operation.selection.y() - operation.source->offset,
+            operation.selection.width(),
+            operation.selection.height(),
+        };
+
+        auto denorm = denormalizeRect(selection);
         std::int64_t sampleStart = denorm.x();
         std::int64_t binStart = denorm.y();
         std::int64_t fftSize = denorm.width(); 
@@ -482,7 +493,7 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
         
         float destinationPosXNorm = operation.destinationPosition.x();
-        float destinationPosYNorm = operation.destinationPosition.y();
+        float destinationPosYNorm = operation.destinationPosition.y() - destination.offset;
 
         std::int64_t destinationSampleStart = destinationPosXNorm * bufferSampleRate;
         std::int64_t destinationBinStart = (2 * destinationPosYNorm / bufferSampleRate) * (fftSize / 2);
@@ -522,6 +533,7 @@ namespace Kaixo::Processing {
             // ------------------------------------------------
 
             destination.delay = destinationSampleStart;
+            destination.offset = 0;
             destination.buffer.clear();
             destination.buffer.resize(fftSize);
             for (std::int64_t i = 0; i < fftSize; ++i) {
@@ -741,7 +753,7 @@ namespace Kaixo::Processing {
             if (!res.layers.empty()) {
                 res.layers[0].selection = { 
                     layer.delay / bufferSampleRate,         // Start at delay in seconds
-                    0.f,                                    // Start at 0Hz
+                    0,                                      // Start at 0Hz
                     layer.buffer.size() / bufferSampleRate, // Width of selection is buffer size in seconds
                     nyquist()                               // Height is nyquist
                 };
@@ -754,6 +766,7 @@ namespace Kaixo::Processing {
             auto res = AudioBufferSpectralInformation::analyze(editing.buffer, fftSize, horizontalResolution, bSizeMs, progress);
             if (!res.layers.empty()) {
                 res.layers[0].selection = selection;
+                res.layers[0].offset = { editing.delay / bufferSampleRate, editing.offset, };
                 spectralInformation.layers.append_range(std::move(res.layers));
             }
         }
