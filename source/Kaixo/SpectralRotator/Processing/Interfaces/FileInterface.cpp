@@ -92,13 +92,13 @@ namespace Kaixo::Processing {
         }
     }
 
-    void FileInterface::seek(float position) {
+    void FileInterface::seek(float seconds) {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
-        case 0: processor.inputFile.seek(position); break;
-        case 1: processor.rotatedFile.seek(position); break;
-        case 2: processor.editor.seek(position); break;
+        case 0: processor.inputFile.seek(seconds); break;
+        case 1: processor.rotatedFile.seek(seconds); break;
+        case 2: processor.editor.seek(seconds); break;
         }
     }
     
@@ -168,9 +168,7 @@ namespace Kaixo::Processing {
             break;
         }        
         case 2: {
-            std::lock_guard lock{ processor.editor.fileMutex };
-            auto combinedBuffer = processor.editor.combined();
-            return AudioBufferSpectralInformation::analyze(combinedBuffer, fftSize, horizontalResolution, blockSize, progress);
+            return processor.editor.analyze(fftSize, horizontalResolution, blockSize, progress);
             break;
         }
         }

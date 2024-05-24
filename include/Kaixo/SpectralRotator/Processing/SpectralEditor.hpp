@@ -10,6 +10,7 @@
 // ------------------------------------------------
 
 #include "Kaixo/SpectralRotator/Processing/Utils/Resampler.hpp"
+#include "Kaixo/SpectralRotator/Processing/Utils/AudioBufferSpectralInformation.hpp"
 
 // ------------------------------------------------
 
@@ -31,7 +32,7 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         void playPause(); // play audio file
-        void seek(float position);
+        void seek(float seconds);
         float position();
 
         // ------------------------------------------------
@@ -48,7 +49,8 @@ namespace Kaixo::Processing {
 
         std::size_t size();
         float length(); // length in seconds
-        float nyquist(); // length in seconds
+        float nyquist(); 
+        float sampleRate();
 
         // ------------------------------------------------
         
@@ -58,7 +60,7 @@ namespace Kaixo::Processing {
         void copy();         // Copy from selected layer to clipboard
         void paste();        // Move from clipboard to editing layer
         void select(Rect<float> rect);  // Set current selection
-        void move(Point<float> amount); // Move selection
+        void move(Point<float> amount, bool remove = true); // Move selection
 
         // ------------------------------------------------
         
@@ -103,10 +105,15 @@ namespace Kaixo::Processing {
         };
 
         void frequencyShift(ComplexBuffer& buffer, std::int64_t bins);
-        void toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::size_t timeOffset);
-        void toTimeDomain(Layer& layer, ComplexBuffer& source, std::size_t timeOffset);
+        void toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::int64_t timeOffset);
+        void toTimeDomain(Layer& layer, ComplexBuffer& source, std::int64_t timeOffset);
 
         void doOperation(Operation operation);
+
+        std::size_t estimateFrequencyShiftSteps(std::size_t fftSize, std::int64_t bins);
+        std::size_t estimateToFrequencyDomainSteps(Layer& layer, std::size_t fftSize, std::size_t timeOffset);
+        std::size_t estimateToTimeDomainSteps(Layer& layer, std::size_t fftSize, std::size_t timeOffset);
+        std::size_t estimateOperationSteps(Operation operation);
 
         // ------------------------------------------------
 
@@ -116,6 +123,19 @@ namespace Kaixo::Processing {
         std::atomic_bool readingFile = false;
         std::size_t seekPosition = 0;
         mutable std::mutex fileMutex{};
+
+        // ------------------------------------------------
+        
+        std::size_t estimatedSteps = 1;
+        std::size_t progress = 0;
+
+        void start() { progress = 0; }
+        void step(std::size_t weight = 1) { progress += weight; }
+
+        // ------------------------------------------------
+        
+        AudioBufferSpectralInformation analyze(std::size_t fftSize,
+            std::size_t horizontalResolution, std::size_t bSizeMs, std::size_t* progress);
 
         // ------------------------------------------------
 

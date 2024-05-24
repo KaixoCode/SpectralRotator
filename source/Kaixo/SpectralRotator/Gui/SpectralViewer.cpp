@@ -95,17 +95,17 @@ namespace Kaixo::Gui {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(m_Image, localDimensions().toFloat());
 
-        float x = m_PlayPosition * (width() - 3);
+        float x = denormalizePosition({ m_PlayPosition, 0 }).x();
         g.setColour({ 210, 210, 210 });
         g.fillRect(Rect{ x, 0, 3, height() });
 
         m_ShowingProgress = false;
         if (settings.file->modifyingFile() || (!m_CausedByResize && m_GeneratingImage) || m_FileWillProbablyChange) {
             m_ShowingProgress = true;
-            bool rotating = settings.file->modifyingFile();
+            bool modifying = settings.file->modifyingFile();
             float fileLoadingProgress = settings.file->loadingProgress();
             float analyzingProgress = static_cast<float>(m_AnalyzingProgress) / m_AnalyzingProgressTotal;
-            float progress = rotating
+            float progress = modifying
                 ? fileLoadingProgress // If file also changed, add to progress bar
                 : analyzingProgress;  // Otherwise just analyzing progress
 
@@ -113,8 +113,8 @@ namespace Kaixo::Gui {
                 .graphics = g,
                 .bounds = localDimensions(),
                 .text = { 
-                    { "$progress", std::format("%{:.0f}", progress * 100) },
-                    { "$load-type", rotating ? "Rotating" : "Analyzing" }
+                    { "$progress", std::format("%{:.0f}", Math::clamp1(progress) * 100) },
+                    { "$load-type", modifying ? "Processing" : "Analyzing" }
                 }
             });
         }
@@ -123,12 +123,12 @@ namespace Kaixo::Gui {
     // ------------------------------------------------
         
     void SpectralViewer::mouseDown(const juce::MouseEvent& event) {
-        float progress = Math::clamp1(static_cast<float>(event.x) / width());
+        float progress = normalizePosition({ event.x, event.y }).x();
         settings.file->seek(progress);
     }
         
     void SpectralViewer::mouseDrag(const juce::MouseEvent& event) {
-        float progress = Math::clamp1(static_cast<float>(event.x) / width());
+        float progress = normalizePosition({ event.x, event.y }).x();
         settings.file->seek(progress);
     }
 
@@ -151,7 +151,8 @@ namespace Kaixo::Gui {
             if (m_ShouldAnalyze) {
                 m_ShouldAnalyze = false;
                 m_AnalyzingProgress = 0;
-                m_AnalyzingProgressTotal = width() * height() + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution;
+                m_AnalyzingProgressTotal = width() * height()
+                    + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution;
                 m_AnalyzeResult = settings.file.call(&Processing::FileInterface::analyzeBuffer, m_FFTSize, m_FFTResolution, m_FFTBlockSize , &m_AnalyzingProgress);
             } else {
                 m_AnalyzingProgress = 0;
@@ -160,14 +161,14 @@ namespace Kaixo::Gui {
 
             m_Generated = juce::Image(juce::Image::PixelFormat::ARGB, width(), height(), true);
 
-            for (std::size_t x = 0; x < m_Generated.getWidth(); ++x) {
-                for (std::size_t y = 0; y < m_Generated.getHeight(); ++y) {
-                    float nx = static_cast<float>(x) / m_Generated.getWidth();
-                    float ny = 1 - static_cast<float>(y) / m_Generated.getHeight();
+            for (Coord x = 0; x < m_Generated.getWidth(); ++x) {
+                for (Coord y = 0; y < m_Generated.getHeight(); ++y) {
                     float dy = m_FFTSize * (1.f / m_Generated.getHeight());
                     float dx = m_FFTResolution * (1.f / m_Generated.getWidth());
+                    Point pos = normalizePosition({ x, y });
+                    Point delta = { 0.f, 0.f };
 
-                    float intensity = m_AnalyzeResult.intensityAt(nx, dx, ny, dy) / m_FFTRange + 1;
+                    float intensity = m_AnalyzeResult.intensityAt(pos.x(), delta.x(), pos.y(), delta.y()) / m_FFTRange + 1;
 
                     Color c1 = T.spectrum.color1.color.base;
                     Color c2 = T.spectrum.color2.color.base;
@@ -216,12 +217,12 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    Point<float> SpectralViewer::normalizePosition(Point<> coord) {
-        float normX = static_cast<float>(coord.x()) / width();
-        float normY = 1 - static_cast<float>(coord.y()) / height();
+    Point<float> SpectralViewer::normalizePosition(Point<float> coord) {
+        float normX = coord.x() / width();
+        float normY = 1 - coord.y() / height();
 
         float timeStart = 0;
-        float timeEnd = settings.file->length();
+        float timeEnd = 10;
 
         float frequencyStart = 0;
         float frequencyEnd = settings.file->nyquist();
@@ -232,9 +233,9 @@ namespace Kaixo::Gui {
         return { x, y };
     }
 
-    Point<> SpectralViewer::denormalizePosition(Point<float> normal) {
+    Point<float> SpectralViewer::denormalizePosition(Point<float> normal) {
         float timeStart = 0;
-        float timeEnd = settings.file->length();
+        float timeEnd = 10;
 
         float frequencyStart = 0;
         float frequencyEnd = settings.file->nyquist();

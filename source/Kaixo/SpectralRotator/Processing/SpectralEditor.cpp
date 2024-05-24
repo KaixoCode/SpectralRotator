@@ -47,13 +47,12 @@ namespace Kaixo::Processing {
         }
     }
 
-    void SpectralEditor::seek(float position) {
-        seekPosition = position * size();
+    void SpectralEditor::seek(float seconds) {
+        seekPosition = seconds * sampleRate();
     }
 
     float SpectralEditor::position() {
-        if (size() == 0) return 0;
-        return static_cast<float>(seekPosition) / size();
+        return static_cast<float>(seekPosition) / sampleRate();
     }
 
     // ------------------------------------------------
@@ -72,6 +71,7 @@ namespace Kaixo::Processing {
         waitForReadingToFinish();
         FileLoadStatus result = file.open(path, bitDepth, sampleRate);
         if (result == FileLoadStatus::Success) {
+            layers[selectedLayer].delay = 0;
             layers[selectedLayer].buffer = std::move(file.buffer);
         }
         modifyingFile = false;
@@ -80,7 +80,7 @@ namespace Kaixo::Processing {
 
     float SpectralEditor::loadingProgress() {
         if (modifyingFile) {
-            return 0;
+            return Math::clamp1(static_cast<float>(progress) / estimatedSteps);
         }
 
         return 1;
@@ -123,41 +123,59 @@ namespace Kaixo::Processing {
     float SpectralEditor::nyquist() {
         return bufferSampleRate / 2;
     }
+    
+    float SpectralEditor::sampleRate() {
+        return bufferSampleRate;
+    }
 
     // ------------------------------------------------
 
     void SpectralEditor::finalizeEdit() {
         if (editing.buffer.empty()) return; // Not editing = nothing to finalize
 
-        auto denorm = denormalizeRect(selection);
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
 
-        doOperation({
+        Operation operation = {
             .source = &editing,
             .selection = selection,
             .destination = &layers[selectedLayer],
             .clearDestination = false,
             .destinationPosition = selection.position(),
             .op = Operation::Copy
-        });
+        };
+
+        estimatedSteps = estimateOperationSteps(operation);
+        doOperation(operation);
 
         // Clear editing layer
         editing.buffer.clear();
         editing.delay = 0;
+
+        modifyingFile = false;
     }
 
     void SpectralEditor::cut() {
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
         clipboardSelection = selection;
 
         // Editing buffer empty = take selection from selected layer
         if (editing.buffer.empty()) {
-            doOperation({
+            Operation operation = {
                 .source = &layers[selectedLayer],
                 .selection = selection,
                 .destination = &clipboard,
                 .clearDestination = true,
                 .destinationPosition = selection.position(),
                 .op = Operation::Move
-            });
+            };
+
+            estimatedSteps = estimateOperationSteps(operation);
+            doOperation(operation);
         } else { // Otherwise just move editing layer to clipboard
             clipboard = std::move(editing);
             editing.buffer.clear();
@@ -165,27 +183,42 @@ namespace Kaixo::Processing {
         }
 
         selection = { 0, 0, 0, 0 }; // Clear selection
+
+        modifyingFile = false;
     }
 
     void SpectralEditor::remove() {
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
         auto denorm = denormalizeRect(selection);
 
         // Not editing = remove from selected layer
         if (editing.buffer.empty()) {
-            doOperation({
+            Operation operation = {
                 .source = &layers[selectedLayer],
                 .selection = selection,
                 .op = Operation::Remove
-            });
+            };
+
+            estimatedSteps = estimateOperationSteps(operation);
+            doOperation(operation);
         } else { // else just remove editing 
             editing.buffer.clear();
             editing.delay = 0;
         }
 
         selection = { 0, 0, 0, 0 }; // Clear selection
+
+        modifyingFile = false;
     }
 
     void SpectralEditor::copy() {
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
         clipboardSelection = selection;
 
         // If editing, we can copy to clipboard directly, and then
@@ -194,44 +227,88 @@ namespace Kaixo::Processing {
             clipboard = editing;
             finalizeEdit();
         } else { // Otherwise take directly from selected layer
-            doOperation({
+            Operation operation = {
                 .source = &layers[selectedLayer],
                 .selection = selection,
                 .destination = &clipboard,
                 .clearDestination = true,
                 .destinationPosition = selection.position(),
                 .op = Operation::Copy
-            });
+            };
+
+            estimatedSteps = estimateOperationSteps(operation);
+            doOperation(operation);
         }
         
         selection = { 0, 0, 0, 0 }; // Clear selection
+
+        modifyingFile = false;
     }
 
     void SpectralEditor::paste() {
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
         finalizeEdit(); // Finalize any current editing before paste
         editing = clipboard; // Copy clipboard to editing layer
 
         selection = clipboardSelection; // And recover clipboard selection
+
+        modifyingFile = false;
     }
 
-    void SpectralEditor::select(Rect<float> rect) { 
+    void SpectralEditor::select(Rect<float> rect) {
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
         finalizeEdit(); // Different select = editing becomes invalid
-        selection = rect; 
+        selection = rect;
+
+        modifyingFile = false;
     }
 
-    void SpectralEditor::move(Point<float> amount) {
+    void SpectralEditor::move(Point<float> amount, bool remove) {
+
+        // ------------------------------------------------
+
         if (selection.isEmpty()) return;
+
+        // ------------------------------------------------
+
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
+        // ------------------------------------------------
+
+        auto denorm = denormalizeRect(selection);
+        std::int64_t fftSizeEstimate = denorm.width();
+
+        // ------------------------------------------------
+
+        estimatedSteps =
+            estimateToFrequencyDomainSteps(editing, fftSizeEstimate, editing.delay) +
+            estimateFrequencyShiftSteps(fftSizeEstimate, 1) +
+            estimateToTimeDomainSteps(editing, fftSizeEstimate, editing.delay);
+
+        // ------------------------------------------------
 
         // Not editing, cut and paste to editing layer
         if (editing.buffer.empty()) {
-            doOperation({
+            Operation operation{
                 .source = &layers[selectedLayer],
                 .selection = selection,
                 .destination = &editing,
                 .clearDestination = true,
                 .destinationPosition = selection.position(),
-                .op = Operation::Move
-            });
+                .op = remove ? Operation::Move : Operation::Copy
+            };
+
+            estimatedSteps += estimateOperationSteps(operation);
+
+            doOperation(operation);
         }
         
         std::int64_t fftSize = editing.buffer.size();
@@ -244,6 +321,8 @@ namespace Kaixo::Processing {
         toTimeDomain(editing, buffer, editing.delay);
 
         selection += amount;
+
+        modifyingFile = false;
     }
 
     // ------------------------------------------------
@@ -274,28 +353,34 @@ namespace Kaixo::Processing {
         }
     }
 
-    void SpectralEditor::toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::size_t timeOffset) {
+    void SpectralEditor::toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::int64_t timeOffset) {
         for (std::int64_t i = 0; i < destination.size(); ++i) {
             std::int64_t index = i + timeOffset - layer.delay;
             if (index >= 0 && index < layer.buffer.size()) {
                 destination.l[i] = layer.buffer[index].l;
                 destination.r[i] = layer.buffer[index].r;
+                step();
             }
         }
 
-        Fft{}.transform(destination.l, false);
-        Fft{}.transform(destination.r, false);
+        Fft fft{};
+        fft.stepRef = &progress;
+        fft.transform(destination.l, false);
+        fft.transform(destination.r, false);
     }
 
-    void SpectralEditor::toTimeDomain(Layer& layer, ComplexBuffer& source, std::size_t timeOffset) {
-        Fft{}.transform(source.l, true);
-        Fft{}.transform(source.r, true);
+    void SpectralEditor::toTimeDomain(Layer& layer, ComplexBuffer& source, std::int64_t timeOffset) {
+        Fft fft{};
+        fft.stepRef = &progress;
+        fft.transform(source.l, true);
+        fft.transform(source.r, true);
 
         for (std::size_t i = 0; i < source.size(); ++i) {
             std::int64_t index = i + timeOffset - layer.delay;
             if (index >= 0 && index < layer.buffer.size()) {
                 layer.buffer[index].l = source.l[i].real() / source.size();
                 layer.buffer[index].r = source.r[i].real() / source.size();
+                step();
             }
         }
     }
@@ -341,7 +426,7 @@ namespace Kaixo::Processing {
 
             ComplexBuffer& buffer = operation.destination == nullptr ? sourceBuffer : removed;
 
-            for (std::size_t i = 0; i < fftSize / 2; ++i) {
+            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
                 if (i >= binStart && i < binStart + bins) {
                     buffer.l[i] = { 0, 0 };
                     buffer.r[i] = { 0, 0 };
@@ -349,6 +434,8 @@ namespace Kaixo::Processing {
                         buffer.l[fftSize - i] = { 0, 0 };
                         buffer.r[fftSize - i] = { 0, 0 };
                     }
+
+                    step();
                 }
             }
 
@@ -388,6 +475,8 @@ namespace Kaixo::Processing {
                         sourceBuffer.l[fftSize - i] = { 0, 0 };
                         sourceBuffer.r[fftSize - i] = { 0, 0 };
                     }
+
+                    step();
                 }
             }
 
@@ -397,8 +486,10 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            Fft{}.transform(sourceBuffer.l, true);
-            Fft{}.transform(sourceBuffer.r, true);
+            Fft fft{};
+            fft.stepRef = &progress;
+            fft.transform(sourceBuffer.l, true);
+            fft.transform(sourceBuffer.r, true);
 
             // ------------------------------------------------
 
@@ -408,6 +499,7 @@ namespace Kaixo::Processing {
             for (std::int64_t i = 0; i < fftSize; ++i) {
                 destination.buffer[i].l = sourceBuffer.l[i].real() / fftSize;
                 destination.buffer[i].r = sourceBuffer.r[i].real() / fftSize;
+                step();
             }
 
             // ------------------------------------------------
@@ -416,7 +508,7 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            // Trying to insert in a layer before its buffer, resize to fit
+            // Trying to insert in a layer before or after its buffer, resize to fit
             if (destinationSampleStart < destination.delay) {
                 std::size_t shortage = destination.delay - destinationSampleStart;
                 AudioBuffer newBuffer;
@@ -424,6 +516,14 @@ namespace Kaixo::Processing {
                 std::memcpy(newBuffer.data() + shortage, destination.buffer.data(), destination.buffer.size() * sizeof(AudioFrame));
                 destination.buffer = std::move(newBuffer);
                 destination.delay = destinationSampleStart;
+            }
+
+            if (destinationSampleStart + fftSize >= destination.delay + destination.buffer.size()) {
+                std::size_t shortage = (destinationSampleStart + fftSize) - (destination.delay + destination.buffer.size());
+                AudioBuffer newBuffer;
+                newBuffer.resize(destination.buffer.size() + shortage);
+                std::memcpy(newBuffer.data(), destination.buffer.data(), destination.buffer.size() * sizeof(AudioFrame));
+                destination.buffer = std::move(newBuffer);
             }
 
             // ------------------------------------------------
@@ -445,6 +545,8 @@ namespace Kaixo::Processing {
                         destinationBuffer.l[fftSize - destI] = sourceBuffer.l[fftSize - i];
                         destinationBuffer.r[fftSize - destI] = sourceBuffer.r[fftSize - i];
                     }
+
+                    step();
                 }
             }
 
@@ -458,6 +560,176 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+    }
+
+    // ------------------------------------------------
+
+    std::size_t SpectralEditor::estimateFrequencyShiftSteps(std::size_t fftSize, std::int64_t bins) {
+        return 1;
+    }
+
+    std::size_t SpectralEditor::estimateToFrequencyDomainSteps(Layer& layer, std::size_t fftSize, std::size_t timeOffset) {
+        std::size_t steps = 0;
+        for (std::int64_t i = 0; i < fftSize; ++i) {
+            std::int64_t index = i + timeOffset - layer.delay;
+            if (index >= 0 && index < layer.buffer.size()) {
+                ++steps;
+            }
+        }
+
+        steps += Fft{}.estimateSteps(fftSize, false) * 2;
+        return steps;
+    }
+
+    std::size_t SpectralEditor::estimateToTimeDomainSteps(Layer& layer, std::size_t fftSize, std::size_t timeOffset) {
+        std::size_t steps = 0;
+        steps += Fft{}.estimateSteps(fftSize, true) * 2;
+
+        for (std::size_t i = 0; i < fftSize; ++i) {
+            std::int64_t index = i + timeOffset - layer.delay;
+            if (index >= 0 && index < layer.buffer.size()) {
+                ++steps;
+            }
+        }
+
+        return steps;
+    }
+
+    // ------------------------------------------------
+
+    std::size_t SpectralEditor::estimateOperationSteps(Operation operation) {
+        
+        // ------------------------------------------------
+        
+        std::size_t steps = 0;
+
+        // ------------------------------------------------
+
+        if (operation.source == nullptr) return steps;
+        if (operation.selection.isEmpty()) return steps;
+
+        // ------------------------------------------------
+
+        bool removeFromSource = operation.op == Operation::Remove
+                             || operation.op == Operation::Move;
+
+        // ------------------------------------------------
+
+        auto denorm = denormalizeRect(operation.selection);
+        std::int64_t sampleStart = denorm.x();
+        std::int64_t binStart = denorm.y();
+        std::int64_t fftSize = denorm.width(); 
+        std::int64_t bins = denorm.height();
+
+        // ------------------------------------------------
+
+        auto& source = *operation.source;
+        steps += estimateToFrequencyDomainSteps(source, fftSize, sampleStart);
+
+        // ------------------------------------------------
+
+        if (removeFromSource) {
+            steps += bins;
+            steps += estimateToTimeDomainSteps(source, fftSize, sampleStart);
+        }
+
+        // ------------------------------------------------
+
+        // At this point, if there's no destination, we're done.
+        if (operation.destination == nullptr) return steps;
+
+        // ------------------------------------------------
+
+        auto& destination = *operation.destination;
+
+        // ------------------------------------------------
+        
+        float destinationPosXNorm = operation.destinationPosition.x();
+        float destinationPosYNorm = operation.destinationPosition.y();
+
+        std::int64_t destinationSampleStart = destinationPosXNorm * bufferSampleRate;
+        std::int64_t destinationBinStart = (2 * destinationPosYNorm / bufferSampleRate) * (fftSize / 2);
+        std::int64_t destinationBinOffset = destinationBinStart - binStart;
+        
+        // ------------------------------------------------
+
+        if (operation.clearDestination) {
+            
+            // ------------------------------------------------
+
+            // This removes everything but the selection from sourceBuffer
+            steps += bins;
+            steps += estimateFrequencyShiftSteps(fftSize, destinationBinOffset);
+            steps += Fft{}.estimateSteps(fftSize, true);
+            steps += fftSize;
+
+            // ------------------------------------------------
+
+        } else {
+
+            // ------------------------------------------------
+
+            steps += estimateToFrequencyDomainSteps(destination, fftSize, destinationSampleStart);
+
+            // ------------------------------------------------
+
+            for (std::int64_t i = 0; i < fftSize / 2; ++i) {
+                std::int64_t destI = i + destinationBinOffset;
+                if (i >= binStart && i < binStart + bins && 
+                    destI >= 0 && destI <= fftSize / 2) 
+                {
+                    ++steps;
+                }
+            }
+
+            // ------------------------------------------------
+            
+            steps += estimateToTimeDomainSteps(destination, fftSize, destinationSampleStart);
+
+            // ------------------------------------------------
+
+        }
+
+        // ------------------------------------------------
+        
+        return steps;
+
+        // ------------------------------------------------
+
+    }
+
+    // ------------------------------------------------
+
+    AudioBufferSpectralInformation SpectralEditor::analyze(std::size_t fftSize,
+        std::size_t horizontalResolution, std::size_t bSizeMs, std::size_t* progress)
+    {
+        std::lock_guard lock{ fileMutex };
+
+        AudioBufferSpectralInformation spectralInformation{};
+
+        for (auto& [id, layer] : layers) {
+            layer.buffer.sampleRate = bufferSampleRate;
+            auto res = AudioBufferSpectralInformation::analyze(layer.buffer, fftSize, horizontalResolution, bSizeMs, progress);
+            if (!res.layers.empty()) {
+                res.layers[0].selection = { 
+                    layer.delay / bufferSampleRate,         // Start at delay in seconds
+                    0.f,                                    // Start at 0Hz
+                    layer.buffer.size() / bufferSampleRate, // Width of selection is buffer size in seconds
+                    nyquist()                               // Height is nyquist
+                };
+                spectralInformation.layers.append_range(std::move(res.layers));
+            }
+        }
+
+        if (!editing.buffer.empty()) {
+            editing.buffer.sampleRate = bufferSampleRate;
+            auto res = AudioBufferSpectralInformation::analyze(editing.buffer, fftSize, horizontalResolution, bSizeMs, progress);
+            if (!res.layers.empty()) {
+                res.layers[0].selection = selection;
+                spectralInformation.layers.append_range(std::move(res.layers));
+            }
+        }
+        return spectralInformation;
     }
 
     // ------------------------------------------------

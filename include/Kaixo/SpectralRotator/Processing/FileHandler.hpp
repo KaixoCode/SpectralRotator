@@ -32,7 +32,7 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         void playPause(); // play audio file
-        void seek(float position);
+        void seek(float seconds);
         float position();
 
         // ------------------------------------------------
@@ -45,6 +45,7 @@ namespace Kaixo::Processing {
 
         float length(); // length of file in seconds
         float nyquist(); 
+        float sampleRate(); 
 
         // ------------------------------------------------
 

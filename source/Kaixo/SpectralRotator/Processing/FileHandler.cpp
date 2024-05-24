@@ -49,14 +49,13 @@ namespace Kaixo::Processing {
         }
     }
 
-    void FileHandler::seek(float position) {
-        seekPosition = position * size();
+    void FileHandler::seek(float seconds) {
+        seekPosition = seconds * sampleRate();
         newSeekPosition = true;
     }
 
     float FileHandler::position() {
-        if (size() == 0) return 0;
-        return static_cast<float>(resampler.position()) / size();
+        return static_cast<float>(resampler.position()) / sampleRate();
     }
 
     // ------------------------------------------------
@@ -129,11 +128,15 @@ namespace Kaixo::Processing {
     }
     
     float FileHandler::length() {
-        return file() ? file()->buffer.size() / file()->buffer.sampleRate : 0;
+        return size() / sampleRate();
     }
     
     float FileHandler::nyquist() {
         return file() ? file()->buffer.sampleRate / 2 : 1;
+    }
+    
+    float FileHandler::sampleRate() {
+        return file() ? file()->buffer.sampleRate : 1;
     }
 
     // ------------------------------------------------

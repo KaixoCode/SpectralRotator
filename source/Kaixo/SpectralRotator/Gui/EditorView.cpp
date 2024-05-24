@@ -39,6 +39,9 @@ namespace Kaixo::Gui {
         Point<> mouse{ event.x, event.y };
 
         if (event.mods.isCtrlDown()) {
+            state = State::Child;
+            spectralViewer->mouseDown(event.getEventRelativeTo(spectralViewer));
+        } else {
             if (editFuture.valid()) {
                 state = State::Waiting;
             } else if (selectedRect().contains(mouse)) {
@@ -50,9 +53,6 @@ namespace Kaixo::Gui {
                 dragEnd = dragStart;
                 moved = { 0, 0 };
             }
-        } else {
-            state = State::Child;
-            spectralViewer->mouseDown(event.getEventRelativeTo(spectralViewer));
         }
     }
 
@@ -69,7 +69,7 @@ namespace Kaixo::Gui {
             break;
         }
         case State::Moving:
-            editFuture = settings.editor->move(moved);
+            editFuture = settings.editor->move(moved, !event.mods.isShiftDown());
             dragStart += moved;
             dragEnd += moved;
             moved = { 0, 0 };
@@ -82,7 +82,7 @@ namespace Kaixo::Gui {
     }
 
     void SpectralEditor::mouseDrag(const juce::MouseEvent& event) {
-        Point<Coord> added{
+        Point<float> added{
             event.getDistanceFromDragStartX(),
             event.getDistanceFromDragStartY(),
         };
@@ -235,11 +235,11 @@ namespace Kaixo::Gui {
         }
 
         if (event.getModifiers().isCtrlDown()) {
-            if (event.getKeyCode() == 'c') {
+            if (event.getKeyCode() == 'C') {
                 spectralEditor->editFuture = spectralEditor->settings.editor->copy();
-            } else if (event.getKeyCode() == 'v') {
+            } else if (event.getKeyCode() == 'V') {
                 spectralEditor->editFuture = spectralEditor->settings.editor->paste();
-            } else if (event.getKeyCode() == 'x') {
+            } else if (event.getKeyCode() == 'X') {
                 spectralEditor->editFuture = spectralEditor->settings.editor->cut();
             }
         }

@@ -38,7 +38,7 @@ namespace Kaixo::Processing {
         float loadingProgress();
 
         void playPause();
-        void seek(float position);
+        void seek(float seconds);
         float position();
         float length(); // Length of opened file in seconds
         float nyquist(); 

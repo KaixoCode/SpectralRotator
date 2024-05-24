@@ -26,7 +26,7 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        double sampleRate = 0;
+        double sampleRate = 1;
 
         // ------------------------------------------------
 

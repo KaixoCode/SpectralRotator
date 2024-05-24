@@ -56,10 +56,10 @@ namespace Kaixo::Processing {
         });
     }
 
-    std::future<void> EditorInterface::move(Point<float> amount) {
-        return asyncTaskPool.push([&, amount, index = settings.index] {
+    std::future<void> EditorInterface::move(Point<float> amount, bool remove) {
+        return asyncTaskPool.push([&, amount, remove, index = settings.index] {
             auto& processor = self<SpectralRotatorProcessor>();
-            processor.editor.move(amount);
+            processor.editor.move(amount, remove);
         });
     }
     

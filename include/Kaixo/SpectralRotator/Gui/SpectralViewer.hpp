@@ -72,8 +72,8 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
         
-        Point<float> normalizePosition(Point<> coord);
-        Point<> denormalizePosition(Point<float> normal);
+        Point<float> normalizePosition(Point<float> coord);
+        Point<float> denormalizePosition(Point<float> normal);
 
         // ------------------------------------------------
         
