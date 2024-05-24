@@ -479,6 +479,9 @@ namespace Kaixo::Processing {
             }
 
             toTimeDomain(source, buffer, sampleStart);
+
+            source.dirtyStart = Math::min(source.dirtyStart, selection.left());
+            source.dirtyEnd = Math::max(source.dirtyEnd, selection.right());
         }
 
         // ------------------------------------------------
@@ -536,6 +539,8 @@ namespace Kaixo::Processing {
             destination.offset = 0;
             destination.buffer.clear();
             destination.buffer.resize(fftSize);
+            destination.dirtyStart = 0;
+            destination.dirtyEnd = fftSize / bufferSampleRate;
             for (std::int64_t i = 0; i < fftSize; ++i) {
                 destination.buffer[i].l = sourceBuffer.l[i].real() / fftSize;
                 destination.buffer[i].r = sourceBuffer.r[i].real() / fftSize;
@@ -593,6 +598,11 @@ namespace Kaixo::Processing {
             // ------------------------------------------------
             
             toTimeDomain(destination, destinationBuffer, destinationSampleStart);
+
+            // ------------------------------------------------
+
+            destination.dirtyStart = Math::min(destination.dirtyStart, destinationSampleStart / bufferSampleRate);
+            destination.dirtyEnd = Math::max(destination.dirtyEnd, (destinationSampleStart + fftSize) / bufferSampleRate);
 
             // ------------------------------------------------
 
@@ -740,37 +750,61 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    AudioBufferSpectralInformation SpectralEditor::analyze(std::size_t fftSize,
-        std::size_t horizontalResolution, std::size_t bSizeMs, std::size_t* progress)
+    void SpectralEditor::analyze(
+        AudioBufferSpectralInformation& reanalyze,
+        std::size_t fftSize,
+        float horizontalResolution, 
+        std::size_t bSizeMs, 
+        std::size_t* progress)
     {
         std::lock_guard lock{ fileMutex };
 
         AudioBufferSpectralInformation spectralInformation{};
+        
+        if (!editing.buffer.empty()) {
+            editing.buffer.sampleRate = bufferSampleRate;
+            AudioBufferSpectralInformation::analyze({
+                .buffer = editing.buffer,
+                .fftSize = fftSize,
+                .horizontalResolution = horizontalResolution,
+                .blockSize = bSizeMs,
+                .progress = progress,
+                .reanalyze = reanalyze.layers[npos],
+                .start = editing.dirtyStart,
+                .end = editing.dirtyEnd
+            });
+
+            editing.dirtyStart = editing.buffer.size() / bufferSampleRate;
+            editing.dirtyEnd = 0;
+
+            reanalyze.layers[npos].selection = selection;
+            reanalyze.layers[npos].offset = { editing.delay / bufferSampleRate, editing.offset, };
+        }
 
         for (auto& [id, layer] : layers) {
             layer.buffer.sampleRate = bufferSampleRate;
-            auto res = AudioBufferSpectralInformation::analyze(layer.buffer, fftSize, horizontalResolution, bSizeMs, progress);
-            if (!res.layers.empty()) {
-                res.layers[0].selection = { 
-                    layer.delay / bufferSampleRate,         // Start at delay in seconds
-                    0,                                      // Start at 0Hz
-                    layer.buffer.size() / bufferSampleRate, // Width of selection is buffer size in seconds
-                    nyquist()                               // Height is nyquist
-                };
-                spectralInformation.layers.append_range(std::move(res.layers));
-            }
-        }
+            
+            AudioBufferSpectralInformation::analyze({
+                .buffer = layer.buffer,
+                .fftSize = fftSize,
+                .horizontalResolution = horizontalResolution,
+                .blockSize = bSizeMs,
+                .progress = progress,
+                .reanalyze = reanalyze.layers[id],
+                .start = layer.dirtyStart,
+                .end = layer.dirtyEnd
+            });
 
-        if (!editing.buffer.empty()) {
-            editing.buffer.sampleRate = bufferSampleRate;
-            auto res = AudioBufferSpectralInformation::analyze(editing.buffer, fftSize, horizontalResolution, bSizeMs, progress);
-            if (!res.layers.empty()) {
-                res.layers[0].selection = selection;
-                res.layers[0].offset = { editing.delay / bufferSampleRate, editing.offset, };
-                spectralInformation.layers.append_range(std::move(res.layers));
-            }
+            layer.dirtyStart = layer.buffer.size() / bufferSampleRate;
+            layer.dirtyEnd = 0;
+
+            reanalyze.layers[id].selection = {
+                layer.delay / bufferSampleRate,         // Start at delay in seconds
+                0,                                      // Start at 0Hz
+                layer.buffer.size() / bufferSampleRate, // Width of selection is buffer size in seconds
+                nyquist()                               // Height is nyquist
+            };
         }
-        return spectralInformation;
     }
 
     // ------------------------------------------------

@@ -51,7 +51,7 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
         
-        std::vector<Layer> layers{};
+        std::map<std::size_t, Layer> layers{};
 
         // ------------------------------------------------
 
@@ -59,9 +59,19 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
         
-        static AudioBufferSpectralInformation analyze(
-            const Processing::AudioBuffer& buffer, std::size_t fftSize, 
-            float horizontalResolution, std::size_t blockSize, std::size_t* progress);
+        struct AnalyzeSettings {
+            const Processing::AudioBuffer& buffer;
+            std::size_t fftSize;        // power of 2
+            float horizontalResolution; // ms
+            std::size_t blockSize;      // ms
+            std::size_t* progress = nullptr;
+
+            AudioBufferSpectralInformation::Layer& reanalyze;
+            float start = 0;
+            float end = std::numeric_limits<float>::max();
+        };
+
+        static void analyze(AnalyzeSettings settings);
 
         // ------------------------------------------------
 

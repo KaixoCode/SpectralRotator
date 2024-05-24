@@ -238,7 +238,7 @@ namespace Kaixo::Gui {
         if (status == FileLoadStatus::Success) {
             spectralEditor->spectralViewer->select({
                 0, 
-                10,  
+                0,  
                 spectralEditor->spectralViewer->settings.file->length(),
                 spectralEditor->spectralViewer->settings.file->nyquist(),
             }, false);

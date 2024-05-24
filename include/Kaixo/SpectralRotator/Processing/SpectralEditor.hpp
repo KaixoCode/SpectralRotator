@@ -78,6 +78,9 @@ namespace Kaixo::Processing {
             Processing::AudioBuffer buffer{};
             std::int64_t delay = 0; // samples
             float offset = 0; // frequency offset in Hz
+
+            float dirtyStart = 0;
+            float dirtyEnd = std::numeric_limits<float>::max();
         };
 
         std::map<std::size_t, Layer> layers;
@@ -136,8 +139,13 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
         
-        AudioBufferSpectralInformation analyze(std::size_t fftSize,
-            std::size_t horizontalResolution, std::size_t bSizeMs, std::size_t* progress);
+        void analyze(
+            AudioBufferSpectralInformation& reanalyze,
+            std::size_t fftSize,
+            float horizontalResolution,
+            std::size_t bSizeMs,
+            std::size_t* progress = nullptr
+        );
 
         // ------------------------------------------------
 

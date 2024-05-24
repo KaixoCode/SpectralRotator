@@ -51,7 +51,7 @@ namespace Kaixo::Processing {
     float AudioBufferSpectralInformation::intensityAt(float x, float y) {
         float intensity = -145;
 
-        for (auto& layer : std::views::reverse(layers)) {
+        for (auto& [id, layer] : std::views::reverse(layers)) {
             if (x > layer.selection.x() && y > layer.selection.y() &&
                 x < layer.selection.x() + layer.selection.width() &&
                 y < layer.selection.y() + layer.selection.height()) 
@@ -68,38 +68,64 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    AudioBufferSpectralInformation AudioBufferSpectralInformation::analyze(
-        const Processing::AudioBuffer& buffer, std::size_t fftSize, 
-        float horizontalResolution, std::size_t bSizeMs, std::size_t* progress) 
-    {
-        if (buffer.empty()) return {};
+    void AudioBufferSpectralInformation::analyze(AnalyzeSettings settings) {
 
-        std::size_t size = buffer.size();
-        std::size_t blockSize = Math::min(fftSize, buffer.sampleRate * (bSizeMs / 1000.f));
-        std::size_t distanceBetweenBlocks = Math::clamp((horizontalResolution / 1000.f) * buffer.sampleRate, 1, size);
+        // ------------------------------------------------
+
+        if (settings.buffer.empty()) return;
+
+        // ------------------------------------------------
+
+        std::size_t size = settings.buffer.size();
+        std::size_t blockSize = Math::min(settings.fftSize, settings.buffer.sampleRate * (settings.blockSize / 1000.f));
+        std::size_t distanceBetweenBlocks = Math::clamp((settings.horizontalResolution / 1000.f) * settings.buffer.sampleRate, 1, size);
         std::size_t blocks = size / distanceBetweenBlocks;
 
+        // ------------------------------------------------
+
         auto get = [&](std::int64_t index) -> AudioFrame {
-            if (index >= 0 && index < buffer.size()) return buffer[index];
+            if (index >= 0 && index < settings.buffer.size()) return settings.buffer[index];
             return { 0, 0 };
         };
 
-        std::vector<std::complex<float>> fftBuffer(fftSize);
+        // ------------------------------------------------
 
-        AudioBufferSpectralInformation spectralInformation;
-        auto& result = spectralInformation.layers.emplace_back();
-        result.frameSize = fftSize / 2 + 1;
+        std::vector<std::complex<float>> fftBuffer(settings.fftSize);
+
+        // ------------------------------------------------
+
+        auto& result = settings.reanalyze;
+        result.frameSize = settings.fftSize / 2 + 1;
         result.intensity.resize(result.frameSize * blocks);
         result.offset = { 0.f, 0.f };
-        result.selection = { 0.f, 0.f, buffer.size() / buffer.sampleRate, buffer.sampleRate / 2 };
-        result.sampleRate = buffer.sampleRate;
+        result.selection = { 0.f, 0.f, settings.buffer.size() / settings.buffer.sampleRate, settings.buffer.sampleRate / 2 };
         // ^^ Default selection is entire buffer
+        result.sampleRate = settings.buffer.sampleRate;
+
+        // ------------------------------------------------
+
         Fft fft;
-        fft.stepRef = progress;
-        for (std::int64_t x = 0; x < blocks; ++x) {
+        fft.stepRef = settings.progress;
+
+        // ------------------------------------------------
+        
+        std::int64_t beginSample = settings.start * settings.buffer.sampleRate;
+        std::int64_t endSample = settings.end * settings.buffer.sampleRate;
+
+        std::int64_t beginBlock = Math::clamp(beginSample / distanceBetweenBlocks, 0, blocks);
+        std::int64_t endBlock = Math::clamp(endSample / distanceBetweenBlocks, beginBlock, blocks);
+
+        // ------------------------------------------------
+
+        for (std::int64_t x = beginBlock; x < endBlock; ++x) {
+
+            // ------------------------------------------------
+
             std::int64_t i = x * distanceBetweenBlocks;
 
-            std::memset(fftBuffer.data(), 0, fftSize * sizeof(std::complex<float>));
+            // ------------------------------------------------
+
+            std::memset(fftBuffer.data(), 0, settings.fftSize * sizeof(std::complex<float>));
             float scale = 0;
             for (std::int64_t j = 0; j < blockSize; ++j) {
                 float progress = static_cast<float>(j) / (blockSize - 1);
@@ -108,18 +134,26 @@ namespace Kaixo::Processing {
                 fftBuffer[j] = get(i + j).average() * window;
             }
 
+            // ------------------------------------------------
+
             fft.transform(fftBuffer, false);
 
-            for (std::size_t y = 0; y < fftSize / 2 + 1; ++y) {
+            // ------------------------------------------------
+
+            for (std::size_t y = 0; y < settings.fftSize / 2 + 1; ++y) {
                 std::size_t index = y + x * result.frameSize;
                 float magnitude = std::abs(fftBuffer[y]);
                 float normalizedMagnitude = (2 * magnitude) / scale; // Apply proper scaling
                 result.intensity[index] = Math::Fast::magnitude_to_db(normalizedMagnitude);
                 if (result.intensity[index] < -145) result.intensity[index] = -145;
             }
+
+            // ------------------------------------------------
+
         }
 
-        return spectralInformation;
+        // ------------------------------------------------
+
     }
 
     // ------------------------------------------------

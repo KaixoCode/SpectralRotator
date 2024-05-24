@@ -149,31 +149,51 @@ namespace Kaixo::Processing {
         return {};
     }
 
-    AudioBufferSpectralInformation FileInterface::analyzeBuffer(
-        std::size_t fftSize, float horizontalResolution, std::size_t blockSize, std::size_t* progress) 
+    void FileInterface::analyzeBuffer(
+        AudioBufferSpectralInformation& reanalyze,
+        std::size_t fftSize, 
+        float horizontalResolution, 
+        std::size_t blockSize,
+        std::size_t* progress)
     {
         auto& processor = self<SpectralRotatorProcessor>();
 
         switch (settings.index) {
         case 0: {
             std::lock_guard lock{ processor.inputFile.fileMutex };
-            if (processor.inputFile.file() == nullptr) return {};
-            return AudioBufferSpectralInformation::analyze(processor.inputFile.file()->buffer, fftSize, horizontalResolution, blockSize, progress);
+            if (processor.inputFile.file() == nullptr) return;
+
+            AudioBufferSpectralInformation::analyze({
+                .buffer = processor.inputFile.file()->buffer, 
+                .fftSize = fftSize,
+                .horizontalResolution = horizontalResolution,
+                .blockSize = blockSize, 
+                .progress = progress,
+                .reanalyze = reanalyze.layers[0]
+            });
             break;
         }
         case 1: {
             std::lock_guard lock{ processor.rotatedFile.fileMutex };
-            if (processor.rotatedFile.file() == nullptr) return {};
-            return AudioBufferSpectralInformation::analyze(processor.rotatedFile.file()->buffer, fftSize, horizontalResolution, blockSize, progress);
+            if (processor.rotatedFile.file() == nullptr) return;
+
+            AudioBufferSpectralInformation::analyze({
+                .buffer = processor.rotatedFile.file()->buffer,
+                .fftSize = fftSize,
+                .horizontalResolution = horizontalResolution,
+                .blockSize = blockSize,
+                .progress = progress,
+                .reanalyze = reanalyze.layers[0]
+            });
             break;
         }        
         case 2: {
-            return processor.editor.analyze(fftSize, horizontalResolution, blockSize, progress);
+            processor.editor.analyze(reanalyze, fftSize, horizontalResolution, blockSize, progress);
             break;
         }
         }
 
-        return {};
+        return;
     }
 
     // ------------------------------------------------

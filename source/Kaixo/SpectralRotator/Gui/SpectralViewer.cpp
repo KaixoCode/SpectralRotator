@@ -192,8 +192,16 @@ namespace Kaixo::Gui {
                 m_ShouldAnalyze = false;
                 m_AnalyzingProgress = 0;
                 m_AnalyzingProgressTotal = width() * height()
-                    + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution;
-                m_AnalyzeResult = settings.file.call(&Processing::FileInterface::analyzeBuffer, m_FFTSize, m_FFTResolution, m_FFTBlockSize , &m_AnalyzingProgress);
+                    + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution * 10;
+
+                settings.file.call(
+                    &Processing::FileInterface::analyzeBuffer, 
+                    m_AnalyzeResult,
+                    m_FFTSize, 
+                    m_FFTResolution,
+                    m_FFTBlockSize,
+                    &m_AnalyzingProgress);
+
             } else {
                 m_AnalyzingProgress = 0;
                 m_AnalyzingProgressTotal = width() * height();

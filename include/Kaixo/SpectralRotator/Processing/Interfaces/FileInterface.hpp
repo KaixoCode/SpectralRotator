@@ -44,7 +44,12 @@ namespace Kaixo::Processing {
         float nyquist(); 
 
         std::filesystem::path path();
-        AudioBufferSpectralInformation analyzeBuffer(std::size_t fftSize, float horizontalResolution, std::size_t blockSize, std::size_t* progress = nullptr);
+        void analyzeBuffer(
+            AudioBufferSpectralInformation& reanalyze,
+            std::size_t fftSize, 
+            float horizontalResolution, 
+            std::size_t blockSize, 
+            std::size_t* progress = nullptr);
 
         // ------------------------------------------------
         
