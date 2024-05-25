@@ -69,7 +69,6 @@ namespace Kaixo::Gui {
             break;
         }
         case State::Moving:
-            editFuture = settings.editor->move(moved, !event.mods.isShiftDown());
             dragStart += moved;
             dragEnd += moved;
             moved = { 0, 0 };
@@ -91,9 +90,13 @@ namespace Kaixo::Gui {
         case State::Selecting:
             dragEnd = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added);
             break;
-        case State::Moving:
-            moved = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added) - dragStart;
+        case State::Moving: {
+            auto curMoved = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added) - dragStart;
+            settings.editor->move(curMoved - moved, !event.mods.isShiftDown());
+            moved = curMoved;
+            spectralViewer->reGenerateImage(true, true);
             break;
+        }
         case State::Child:
             spectralViewer->mouseDrag(event.getEventRelativeTo(spectralViewer));
             break;
@@ -112,9 +115,9 @@ namespace Kaixo::Gui {
 
     void SpectralEditor::paintOverChildren(juce::Graphics& g) {
         auto rect = selectedRect();
-        g.setColour(Color{ 255, 255, 255, 40 });
+        g.setColour(Color{ 255, 255, 255, 20 });
         g.fillRect(rect);
-        g.setColour(Color{ 255, 255, 255, 255 });
+        g.setColour(Color{ 255, 255, 255, 80 });
         g.drawRect(rect, 1);
     }
 
