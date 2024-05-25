@@ -20,7 +20,7 @@ namespace Kaixo::Processing {
             return;
         }
 
-        std::size_t position = seekPosition;
+        std::int64_t position = seekPosition;
         AudioFrame result = { 0, 0 };
         for (auto& [id, layer] : layers) {
             if (layer.delay < position && position < layer.delay + layer.buffer.size()) {
@@ -29,7 +29,7 @@ namespace Kaixo::Processing {
         }
 
         output = { result.l, result.r };
-        if (++seekPosition > size()) {
+        if (++seekPosition > static_cast<std::int64_t>(size())) {
             playing = false;
             seekPosition = 0;
         }
@@ -314,6 +314,30 @@ namespace Kaixo::Processing {
         modifyingFile = false;
     }
 
+    void SpectralEditor::brush(Point<float> position) {
+        if (clipboard.buffer.empty()) return; // Brush paints using the clipboard
+
+        std::lock_guard lock{ fileMutex };
+
+        modifyingFile = true;
+        waitForReadingToFinish();
+        start();
+
+        Operation operation = {
+            .source = &clipboard,
+            .selection = clipboardSelection,
+            .destination = &layers[selectedLayer],
+            .clearDestination = false,
+            .destinationPosition = position,
+            .op = Operation::Add
+        };
+
+        estimatedSteps = estimateOperationSteps(operation);
+        doOperation(operation);
+
+        modifyingFile = false;
+    }
+
     // ------------------------------------------------
     
     Rect<std::int64_t> SpectralEditor::denormalizeRect(Rect<float> rect) {
@@ -352,36 +376,68 @@ namespace Kaixo::Processing {
     }
 
     void SpectralEditor::Layer::extendDirty(Point<float> minmax) {
-        dirtyStart = Math::min(dirtyStart, minmax.x());
-        dirtyEnd = Math::max(dirtyEnd, minmax.y());
+        constexpr float boundary = 0.1; // Additional boundary in seconds
+        dirtyStart = Math::min(dirtyStart, minmax.x() - boundary);
+        dirtyEnd = Math::max(dirtyEnd, minmax.y() + boundary);
     }
 
     // ------------------------------------------------
 
-    void SpectralEditor::frequencyShift(ComplexBuffer& buffer, std::int64_t bins) {
+    void SpectralEditor::frequencyShift(ComplexBuffer& buffer, std::int64_t bins, bool clearMoved) {
         const auto fftSize = buffer.size();
-        // Offset the to account for destination offset
-        if (bins > 0) {
+        if (bins > fftSize / 2) {
+            std::memset(buffer.l.data() + fftSize, 0, fftSize * sizeof(std::complex<float>));
+            std::memset(buffer.r.data() + fftSize, 0, fftSize * sizeof(std::complex<float>));
+        } else if (bins > 0) {
             std::memmove(buffer.l.data() + bins, buffer.l.data(), (fftSize / 2 - bins) * sizeof(std::complex<float>));
             std::memmove(buffer.r.data() + bins, buffer.r.data(), (fftSize / 2 - bins) * sizeof(std::complex<float>));
-            std::memmove(buffer.l.data() + fftSize / 2, buffer.l.data() + fftSize / 2 + bins, (fftSize / 2 - bins) * sizeof(std::complex<float>));
-            std::memmove(buffer.r.data() + fftSize / 2, buffer.r.data() + fftSize / 2 + bins, (fftSize / 2 - bins) * sizeof(std::complex<float>));
+
+            if (clearMoved) {
+                std::memset(buffer.l.data(), 0, bins * sizeof(std::complex<float>));
+                std::memset(buffer.r.data(), 0, bins * sizeof(std::complex<float>));
+            }
+
+            std::memset(buffer.l.data() + fftSize / 2, 0, (fftSize / 2) * sizeof(std::complex<float>));
+            std::memset(buffer.r.data() + fftSize / 2, 0, (fftSize / 2) * sizeof(std::complex<float>));
         } else if (bins < 0) {
             std::memmove(buffer.l.data(), buffer.l.data() - bins, (fftSize / 2 + bins) * sizeof(std::complex<float>));
             std::memmove(buffer.r.data(), buffer.r.data() - bins, (fftSize / 2 + bins) * sizeof(std::complex<float>));
-            std::memmove(buffer.l.data() + fftSize / 2 - bins, buffer.l.data() + fftSize / 2, (fftSize / 2 + bins) * sizeof(std::complex<float>));
-            std::memmove(buffer.r.data() + fftSize / 2 - bins, buffer.r.data() + fftSize / 2, (fftSize / 2 + bins) * sizeof(std::complex<float>));
+
+            if (clearMoved) {
+                std::memset(buffer.l.data() + fftSize / 2 + bins, 0, -bins * sizeof(std::complex<float>));
+                std::memset(buffer.r.data() + fftSize / 2 + bins, 0, -bins * sizeof(std::complex<float>));
+            }
+
+            std::memset(buffer.l.data() + fftSize / 2, 0, (fftSize / 2) * sizeof(std::complex<float>));
+            std::memset(buffer.r.data() + fftSize / 2, 0, (fftSize / 2) * sizeof(std::complex<float>));
         }
     }
 
-    void SpectralEditor::toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::int64_t timeOffset) {
-        for (std::int64_t i = 0; i < destination.size(); ++i) {
+    void SpectralEditor::toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::int64_t timeOffset, float smooth, bool additive) {
+        std::int64_t size = destination.size();
+        for (std::int64_t i = 0; i < size; ++i) {
+            float mult = 1;
+            
+            if (i < smooth * size / 2) {
+                mult = 0.5 - 0.5 * Math::Fast::ncos(0.5 * i / (smooth * size / 2));
+            }
+            
+            if (size - i - 1 < smooth * size / 2) {
+                mult = 0.5 - 0.5 * Math::Fast::ncos(0.5 * (size - i - 1) / (smooth * size / 2));
+            }
+
             std::int64_t index = i + timeOffset - layer.delay;
             if (index >= 0 && index < layer.buffer.size()) {
-                destination.l[i] = layer.buffer[index].l;
-                destination.r[i] = layer.buffer[index].r;
-                step();
+                if (additive) {
+                    destination.l[i] += mult * layer.buffer[index].l;
+                    destination.r[i] += mult * layer.buffer[index].r;
+                } else {
+                    destination.l[i] = mult * layer.buffer[index].l;
+                    destination.r[i] = mult * layer.buffer[index].r;
+                }
             }
+
+            step();
         }
 
         Fft fft{};
@@ -390,19 +446,36 @@ namespace Kaixo::Processing {
         fft.transform(destination.r, false);
     }
 
-    void SpectralEditor::toTimeDomain(Layer& layer, ComplexBuffer& source, std::int64_t timeOffset) {
+    void SpectralEditor::toTimeDomain(Layer& layer, ComplexBuffer& source, std::int64_t timeOffset, float smooth, bool additive) {
         Fft fft{};
         fft.stepRef = &progress;
         fft.transform(source.l, true);
         fft.transform(source.r, true);
 
-        for (std::size_t i = 0; i < source.size(); ++i) {
+        std::int64_t size = source.size();
+        for (std::size_t i = 0; i < size; ++i) {
+            float mult = 1;
+
+            if (i < smooth * size / 2) {
+                mult = 0.5 - 0.5 * Math::Fast::ncos(0.5 * i / (smooth * size / 2));
+            }
+
+            if (size - i - 1 < smooth * size / 2) {
+                mult = 0.5 - 0.5 * Math::Fast::ncos(0.5 * (size - i - 1) / (smooth * size / 2));
+            }
+
             std::int64_t index = i + timeOffset - layer.delay;
             if (index >= 0 && index < layer.buffer.size()) {
-                layer.buffer[index].l = source.l[i].real() / source.size();
-                layer.buffer[index].r = source.r[i].real() / source.size();
-                step();
+                if (additive) {
+                    layer.buffer[index].l += mult * source.l[i].real() / source.size();
+                    layer.buffer[index].r += mult * source.r[i].real() / source.size();
+                } else {
+                    layer.buffer[index].l = mult * source.l[i].real() / source.size();
+                    layer.buffer[index].r = mult * source.r[i].real() / source.size();
+                }
             }
+
+            step();
         }
     }
 
@@ -414,6 +487,9 @@ namespace Kaixo::Processing {
         if (operation.selection.isEmpty()) return;
 
         // ------------------------------------------------
+
+        bool smooth = operation.op == Operation::Add;
+        float smoothAmount = 1;
 
         bool removeFromSource = operation.op == Operation::Remove
                              || operation.op == Operation::Move;
@@ -438,7 +514,7 @@ namespace Kaixo::Processing {
         auto& source = *operation.source;
         ComplexBuffer sourceBuffer{};
         sourceBuffer.resize(fftSize);
-        toFrequencyDomain(source, sourceBuffer, sampleStart);
+        toFrequencyDomain(source, sourceBuffer, sampleStart, smooth ? smoothAmount : 0);
 
         // ------------------------------------------------
 
@@ -536,19 +612,47 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
+        } else if (operation.op == Operation::Add) {
+
+            // ------------------------------------------------
+
+            if (destinationSampleStart + fftSize >= destination.delay + destination.buffer.size()) {
+                std::size_t shortage = (destinationSampleStart + fftSize) - (destination.delay + destination.buffer.size());
+                AudioBuffer newBuffer;
+                newBuffer.resize(destination.buffer.size() + shortage);
+                std::memcpy(newBuffer.data(), destination.buffer.data(), destination.buffer.size() * sizeof(AudioFrame));
+                destination.buffer = std::move(newBuffer);
+            }
+
+            // ------------------------------------------------
+
+            frequencyShift(sourceBuffer, destinationBinOffset, true);
+
+
+            toTimeDomain(destination, sourceBuffer, destinationSampleStart, smoothAmount, true);
+
+            // ------------------------------------------------
+
+            destination.extendDirty({
+                destinationSampleStart / bufferSampleRate,
+                (destinationSampleStart + fftSize) / bufferSampleRate
+            });
+
+            // ------------------------------------------------
+
         } else {
 
             // ------------------------------------------------
 
             // Trying to insert in a layer before or after its buffer, resize to fit
-            if (destinationSampleStart < destination.delay) {
-                std::size_t shortage = destination.delay - destinationSampleStart;
-                AudioBuffer newBuffer;
-                newBuffer.resize(destination.buffer.size() + shortage);
-                std::memcpy(newBuffer.data() + shortage, destination.buffer.data(), destination.buffer.size() * sizeof(AudioFrame));
-                destination.buffer = std::move(newBuffer);
-                destination.delay = destinationSampleStart;
-            }
+            //if (destinationSampleStart < destination.delay) {
+            //    std::size_t shortage = destination.delay - destinationSampleStart;
+            //    AudioBuffer newBuffer;
+            //    newBuffer.resize(destination.buffer.size() + shortage);
+            //    std::memcpy(newBuffer.data() + shortage, destination.buffer.data(), destination.buffer.size() * sizeof(AudioFrame));
+            //    destination.buffer = std::move(newBuffer);
+            //    destination.delay = destinationSampleStart;
+            //}
 
             if (destinationSampleStart + fftSize >= destination.delay + destination.buffer.size()) {
                 std::size_t shortage = (destinationSampleStart + fftSize) - (destination.delay + destination.buffer.size());
@@ -696,10 +800,19 @@ namespace Kaixo::Processing {
             
             // ------------------------------------------------
 
-            // This removes everything but the selection from sourceBuffer
             steps += bins;
             steps += estimateFrequencyShiftSteps(fftSize, destinationBinOffset);
-            steps += Fft{}.estimateSteps(fftSize, true);
+            steps += Fft{}.estimateSteps(fftSize, true) * 2;
+            steps += fftSize;
+
+            // ------------------------------------------------
+
+        } else if (operation.op == Operation::Add) {
+
+            // ------------------------------------------------
+
+            steps += estimateFrequencyShiftSteps(fftSize, destinationBinOffset);
+            steps += Fft{}.estimateSteps(fftSize, true) * 2;
             steps += fftSize;
 
             // ------------------------------------------------
@@ -756,21 +869,21 @@ namespace Kaixo::Processing {
         reanalyze.horizontalResolution = horizontalResolution;
         reanalyze.blockSize = bSizeMs;
 
+        editing.buffer.sampleRate = bufferSampleRate;
+        AudioBufferSpectralInformation::analyze({
+            .buffer = editing.buffer,
+            .fftSize = fftSize,
+            .horizontalResolution = horizontalResolution,
+            .blockSize = bSizeMs,
+            .progress = progress,
+            .reanalyze = reanalyze.layers[npos],
+            .start = everythingDirty ? 0.f : editing.dirtyStart,
+            .end = everythingDirty ? 1e6f : editing.dirtyEnd
+        });
+
+        editing.dirty(false);
+
         if (!editing.buffer.empty()) {
-            editing.buffer.sampleRate = bufferSampleRate;
-            AudioBufferSpectralInformation::analyze({
-                .buffer = editing.buffer,
-                .fftSize = fftSize,
-                .horizontalResolution = horizontalResolution,
-                .blockSize = bSizeMs,
-                .progress = progress,
-                .reanalyze = reanalyze.layers[npos],
-                .start = everythingDirty ? 0.f : editing.dirtyStart,
-                .end = everythingDirty ? 1e6f : editing.dirtyEnd
-            });
-
-            editing.dirty(false);
-
             reanalyze.layers[npos].selection = selection;
             reanalyze.layers[npos].offset = { editing.delay / bufferSampleRate, editing.offset, };
         }

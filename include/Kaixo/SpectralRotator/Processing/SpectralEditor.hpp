@@ -57,6 +57,7 @@ namespace Kaixo::Processing {
         void paste();        // Move from clipboard to editing layer
         void select(Rect<float> rect);  // Set current selection
         void move(Point<float> amount, bool remove = true); // Move selection
+        void brush(Point<float> position); // Use clipboard as brush
 
         // ------------------------------------------------
         
@@ -103,15 +104,16 @@ namespace Kaixo::Processing {
             Point<float> destinationPosition = selection.position();
             // Operation to perform
             enum { 
-                Move,  // Remove from source, overwrite in destination
-                Copy,  // Keep in source, and overwrite in destination
-                Remove // Remove from source, destination is unused
+                Move,   // Remove from source, overwrite in destination
+                Copy,   // Keep in source, and overwrite in destination
+                Remove, // Remove from source, destination is unused
+                Add,    // Add on top of destination
             } op;
         };
 
-        void frequencyShift(ComplexBuffer& buffer, std::int64_t bins);
-        void toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::int64_t timeOffset);
-        void toTimeDomain(Layer& layer, ComplexBuffer& source, std::int64_t timeOffset);
+        void frequencyShift(ComplexBuffer& buffer, std::int64_t bins, bool clearMoved = false);
+        void toFrequencyDomain(Layer& layer, ComplexBuffer& destination, std::int64_t timeOffset, float smooth = 0, bool additive = false);
+        void toTimeDomain(Layer& layer, ComplexBuffer& source, std::int64_t timeOffset, float smooth = 0, bool additive = false);
 
         void doOperation(Operation operation);
 
@@ -126,7 +128,7 @@ namespace Kaixo::Processing {
         std::atomic_bool playing = false;
         std::atomic_bool modifyingFile = false;
         std::atomic_bool readingFile = false;
-        std::size_t seekPosition = 0;
+        std::int64_t seekPosition = 0;
         mutable std::mutex fileMutex{};
 
         // ------------------------------------------------

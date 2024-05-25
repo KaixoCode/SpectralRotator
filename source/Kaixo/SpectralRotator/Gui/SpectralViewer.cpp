@@ -103,6 +103,8 @@ namespace Kaixo::Gui {
         g.setColour({ 210, 210, 210 });
         g.fillRect(Rect{ x, 0, 3, height() });
 
+        if (!showProgress) return;
+
         m_ShowingProgress = false;
         if (settings.file->modifyingFile() || (!m_AnalyzeInBackground && m_GeneratingImage) || m_FileWillProbablyChange) {
             m_ShowingProgress = true;
@@ -176,7 +178,7 @@ namespace Kaixo::Gui {
         if (withAnalyze) m_ShouldAnalyze = true;
 
         m_GeneratingThreadPool.clear(); // Clear any tasks, only the latest one is important!
-        m_GeneratingThreadPool.push([&, inBackground]() {           
+        m_GeneratingThreadPool.push([&, inBackground]() {
             std::lock_guard lock{ m_AnalyzeResultMutex };
             m_AnalyzeInBackground = inBackground;
 

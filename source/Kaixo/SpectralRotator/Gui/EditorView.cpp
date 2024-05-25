@@ -38,13 +38,17 @@ namespace Kaixo::Gui {
     void SpectralEditor::mouseDown(const juce::MouseEvent& event) {
         Point<> mouse{ event.x, event.y };
 
-        if (event.mods.isCtrlDown() || event.mods.isMiddleButtonDown()) {
+        if (event.mods.isRightButtonDown()) {
+            spectralViewer->showProgress = false;
+            state = State::Brush;
+        } else if (event.mods.isCtrlDown() || event.mods.isMiddleButtonDown()) {
             state = State::Child;
             spectralViewer->mouseDown(event.getEventRelativeTo(spectralViewer));
         } else {
             if (editFuture.valid()) {
                 state = State::Waiting;
             } else if (selectedRect().contains(mouse)) {
+                settings.editor->move({ 0, 0 }, !event.mods.isShiftDown());
                 state = State::Moving;
                 moved = { 0, 0 };
             } else {
@@ -78,6 +82,7 @@ namespace Kaixo::Gui {
             break;
         }
 
+        spectralViewer->showProgress = true;
     }
 
     void SpectralEditor::mouseDrag(const juce::MouseEvent& event) {
@@ -87,12 +92,18 @@ namespace Kaixo::Gui {
         };
 
         switch (state) {
+        case State::Brush: {
+            auto curPos = spectralViewer->normalizePosition({ event.x, event.y });
+            editFuture = settings.editor->brush(curPos);
+            spectralViewer->reGenerateImage(true, true);
+            break;
+        }
         case State::Selecting:
             dragEnd = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added);
             break;
         case State::Moving: {
             auto curMoved = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + added) - dragStart;
-            settings.editor->move(curMoved - moved, !event.mods.isShiftDown());
+            settings.editor->move(curMoved - moved, true);
             moved = curMoved;
             spectralViewer->reGenerateImage(true, true);
             break;

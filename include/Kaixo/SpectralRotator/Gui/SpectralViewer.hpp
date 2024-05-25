@@ -85,6 +85,10 @@ namespace Kaixo::Gui {
         void select(Rect<float> rect, bool regen = true);
 
         // ------------------------------------------------
+
+        bool showProgress = true;
+
+        // ------------------------------------------------
         
     private:
         mutable std::mutex m_AnalyzeResultMutex{};

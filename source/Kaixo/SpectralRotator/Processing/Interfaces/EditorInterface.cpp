@@ -63,6 +63,13 @@ namespace Kaixo::Processing {
         });
     }
     
+    std::future<void> EditorInterface::brush(Point<float> position) {
+        return asyncTaskPool.push([&, position, index = settings.index] {
+            auto& processor = self<SpectralRotatorProcessor>();
+            processor.editor.brush(position);
+        });
+    }
+    
     Rect<float> EditorInterface::selection() {
         auto& processor = self<SpectralRotatorProcessor>();
         return processor.editor.selection;

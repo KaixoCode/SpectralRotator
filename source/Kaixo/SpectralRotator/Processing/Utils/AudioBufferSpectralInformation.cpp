@@ -72,13 +72,9 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        if (settings.buffer.empty()) return;
-
-        // ------------------------------------------------
-
         std::int64_t size = settings.buffer.size();
         std::int64_t blockSize = Math::min(settings.fftSize, settings.buffer.sampleRate * (settings.blockSize / 1000.f));
-        std::int64_t distanceBetweenBlocks = Math::clamp((settings.horizontalResolution / 1000.f) * settings.buffer.sampleRate, 1, size);
+        std::int64_t distanceBetweenBlocks = Math::max((settings.horizontalResolution / 1000.f) * settings.buffer.sampleRate, 1);
         std::int64_t blocks = size / distanceBetweenBlocks;
 
         // ------------------------------------------------

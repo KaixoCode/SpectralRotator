@@ -38,6 +38,7 @@ namespace Kaixo::Processing {
         std::future<void> paste();
         std::future<void> select(Rect<float> rect);
         std::future<void> move(Point<float> amount, bool remove = true);
+        std::future<void> brush(Point<float> position);
 
         Rect<float> selection();
 

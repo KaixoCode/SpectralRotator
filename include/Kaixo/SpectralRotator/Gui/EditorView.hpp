@@ -88,7 +88,7 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
         
         enum class State {
-            Waiting, Selecting, Moving, Child
+            Waiting, Selecting, Moving, Child, Brush
         } state = State::Selecting;
 
         // ------------------------------------------------
