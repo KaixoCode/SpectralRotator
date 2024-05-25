@@ -145,6 +145,15 @@ namespace Kaixo::Gui {
         return Rect<>{ minX, minY, maxX - minX, maxY - minY };
     }
 
+    void SpectralEditor::move(Point<float> amount, bool remove) {
+        auto move = spectralViewer->normalizePosition(spectralViewer->denormalizePosition(dragStart) + amount) - dragStart;
+        settings.editor->move(move, remove);
+        spectralViewer->reGenerateImage(true, true);
+        dragStart += move;
+        dragEnd += move;
+        moved = { 0, 0 };
+    }
+
     // ------------------------------------------------
 
     EditorView::EditorView(Context c, Settings s)
@@ -261,6 +270,33 @@ namespace Kaixo::Gui {
 
         if (event.getKeyCode() == event.deleteKey) {
             spectralEditor->editFuture = spectralEditor->settings.editor->remove();
+            return true;
+        }
+
+        float amt = event.getModifiers().isShiftDown() ? 1 : event.getModifiers().isCtrlDown() ? 20 : 10;
+
+        if (event.getKeyCode() == event.returnKey) {
+            spectralEditor->editFuture = spectralEditor->settings.editor->select({ 0, 0, 0, 0 });
+            return true;
+        }
+        
+        if (event.getKeyCode() == event.upKey) {
+            spectralEditor->move({ 0, -amt });
+            return true;
+        }
+        
+        if (event.getKeyCode() == event.downKey) {
+            spectralEditor->move({ 0, amt });
+            return true;
+        }
+        
+        if (event.getKeyCode() == event.leftKey) {
+            spectralEditor->move({ -amt, 0 });
+            return true;
+        }
+        
+        if (event.getKeyCode() == event.rightKey) {
+            spectralEditor->move({ amt, 0 });
             return true;
         }
 

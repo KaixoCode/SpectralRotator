@@ -176,7 +176,7 @@ namespace Kaixo::Gui {
         if (withAnalyze) m_ShouldAnalyze = true;
 
         m_GeneratingThreadPool.clear(); // Clear any tasks, only the latest one is important!
-        m_GeneratingThreadPool.push([&, inBackground]() {
+        m_GeneratingThreadPool.push([&, inBackground]() {           
             std::lock_guard lock{ m_AnalyzeResultMutex };
             m_AnalyzeInBackground = inBackground;
 
@@ -191,11 +191,9 @@ namespace Kaixo::Gui {
             if (m_ShouldAnalyze) {
                 m_ShouldAnalyze = false;
                 m_AnalyzingProgress = 0;
-                m_AnalyzingProgressTotal = width() * height()
-                    + Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution * 10;
+                m_AnalyzingProgressTotal = Processing::Fft{}.estimateSteps(m_FFTSize, false) * m_FFTResolution * 1000;
 
-                settings.file.call(
-                    &Processing::FileInterface::analyzeBuffer, 
+                settings.file->analyzeBuffer(
                     m_AnalyzeResult,
                     m_FFTSize, 
                     m_FFTResolution,
@@ -205,6 +203,13 @@ namespace Kaixo::Gui {
             } else {
                 m_AnalyzingProgress = 0;
                 m_AnalyzingProgressTotal = width() * height();
+            }
+
+            // Can't create 0-sized image
+            if (width() == 0 || height() == 0) {
+                m_FileWillProbablyChange = false;
+                m_GeneratingImage = false;
+                return;
             }
 
             m_Generated = juce::Image(juce::Image::PixelFormat::ARGB, width(), height(), true);

@@ -71,11 +71,8 @@ namespace Kaixo::Processing {
         waitForReadingToFinish();
         FileLoadStatus result = file.open(path, bitDepth, sampleRate);
         if (result == FileLoadStatus::Success) {
-            layers[selectedLayer].delay = 0;
-            layers[selectedLayer].offset = 0;
+            layers[selectedLayer].clear();
             layers[selectedLayer].buffer = std::move(file.buffer);
-            layers[selectedLayer].dirtyStart = 0;
-            layers[selectedLayer].dirtyEnd = std::numeric_limits<float>::max();
         }
         modifyingFile = false;
         return result;
@@ -87,26 +84,6 @@ namespace Kaixo::Processing {
         }
 
         return 1;
-    }
-
-    // ------------------------------------------------
-
-    Processing::AudioBuffer SpectralEditor::combined() {
-        AudioBuffer result;
-        result.sampleRate = bufferSampleRate;
-        result.resize(size());
-
-        for (std::size_t i = 0; i < editing.buffer.size(); ++i) {
-            result[i + editing.delay] += editing.buffer[i];
-        }
-
-        for (auto& [id, layer] : layers) {
-            for (std::size_t i = 0; i < layer.buffer.size(); ++i) {
-                result[i + layer.delay] += layer.buffer[i];
-            }
-        }
-
-        return result;
     }
 
     // ------------------------------------------------
@@ -149,9 +126,7 @@ namespace Kaixo::Processing {
         doOperation(operation);
 
         // Clear editing layer
-        editing.buffer.clear();
-        editing.delay = 0;
-        editing.offset = 0;
+        editing.clear();
     }
 
     void SpectralEditor::cut() {
@@ -178,9 +153,7 @@ namespace Kaixo::Processing {
             doOperation(operation);
         } else { // Otherwise just move editing layer to clipboard
             clipboard = std::move(editing);
-            editing.buffer.clear();
-            editing.delay = 0;
-            editing.offset = 0;
+            editing.clear();
         }
 
         selection = { 0, 0, 0, 0 }; // Clear selection
@@ -208,9 +181,7 @@ namespace Kaixo::Processing {
             estimatedSteps = estimateOperationSteps(operation);
             doOperation(operation);
         } else { // else just remove editing 
-            editing.buffer.clear();
-            editing.delay = 0;
-            editing.offset = 0;
+            editing.clear();
         }
 
         selection = { 0, 0, 0, 0 }; // Clear selection
@@ -260,6 +231,7 @@ namespace Kaixo::Processing {
 
         finalizeEdit(); // Finalize any current editing before paste
         editing = clipboard; // Copy clipboard to editing layer
+        editing.dirty(true);
 
         selection = clipboardSelection; // And recover clipboard selection
 
@@ -274,8 +246,7 @@ namespace Kaixo::Processing {
         start();
 
         finalizeEdit(); // Different select = editing becomes invalid
-        // Snap to samples/fft bins
-        selection = normalizeRect(denormalizeRect(rect));
+        selection = rect;
 
         modifyingFile = false;
     }
@@ -302,9 +273,6 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         estimatedSteps = 0;
-            //estimateToFrequencyDomainSteps(editing, fftSizeEstimate, editing.delay) +
-            //estimateFrequencyShiftSteps(fftSizeEstimate, 1) +
-            //estimateToTimeDomainSteps(editing, fftSizeEstimate, editing.delay);
 
         // ------------------------------------------------
 
@@ -341,12 +309,6 @@ namespace Kaixo::Processing {
         std::int64_t binShift = fftSize * amount.y() / bufferSampleRate;
         editing.delay += amount.x() * bufferSampleRate;
         editing.offset += amount.y();
-        //ComplexBuffer buffer;
-        //buffer.resize(fftSize);
-        //toFrequencyDomain(editing, buffer, editing.delay);
-        //frequencyShift(buffer, binShift);
-        //toTimeDomain(editing, buffer, editing.delay);
-
         selection += amount;
 
         modifyingFile = false;
@@ -368,6 +330,30 @@ namespace Kaixo::Processing {
         float freqStart = rect.y() * bufferSampleRate / rect.width();
         float freqWidth = rect.height() * bufferSampleRate / rect.width();
         return { timeStart, freqStart, timeWidth, freqWidth };
+    }
+
+    // ------------------------------------------------
+
+    void SpectralEditor::Layer::clear() {
+        buffer.clear();
+        delay = 0;
+        offset = 0;
+        dirty(true);
+    }
+
+    void SpectralEditor::Layer::dirty(bool isDirty) {
+        if (isDirty) {
+            dirtyStart = 0;
+            dirtyEnd = 1e6;
+        } else {
+            dirtyStart = 1e6;
+            dirtyEnd = 0;
+        }
+    }
+
+    void SpectralEditor::Layer::extendDirty(Point<float> minmax) {
+        dirtyStart = Math::min(dirtyStart, minmax.x());
+        dirtyEnd = Math::max(dirtyEnd, minmax.y());
     }
 
     // ------------------------------------------------
@@ -483,8 +469,7 @@ namespace Kaixo::Processing {
 
             toTimeDomain(source, buffer, sampleStart);
 
-            source.dirtyStart = Math::min(source.dirtyStart, selection.left());
-            source.dirtyEnd = Math::max(source.dirtyEnd, selection.right());
+            source.extendDirty({ selection.left(), selection.right() });
         }
 
         // ------------------------------------------------
@@ -542,8 +527,7 @@ namespace Kaixo::Processing {
             destination.offset = 0;
             destination.buffer.clear();
             destination.buffer.resize(fftSize);
-            destination.dirtyStart = 0;
-            destination.dirtyEnd = fftSize / bufferSampleRate;
+            destination.dirty(true);
             for (std::int64_t i = 0; i < fftSize; ++i) {
                 destination.buffer[i].l = sourceBuffer.l[i].real() / fftSize;
                 destination.buffer[i].r = sourceBuffer.r[i].real() / fftSize;
@@ -604,8 +588,10 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            destination.dirtyStart = Math::min(destination.dirtyStart, destinationSampleStart / bufferSampleRate);
-            destination.dirtyEnd = Math::max(destination.dirtyEnd, (destinationSampleStart + fftSize) / bufferSampleRate);
+            destination.extendDirty({
+                destinationSampleStart / bufferSampleRate,
+                (destinationSampleStart + fftSize) / bufferSampleRate
+            });
 
             // ------------------------------------------------
 
@@ -762,8 +748,14 @@ namespace Kaixo::Processing {
     {
         std::lock_guard lock{ fileMutex };
 
-        AudioBufferSpectralInformation spectralInformation{};
-        
+        bool everythingDirty = reanalyze.fftSize != fftSize
+            || reanalyze.horizontalResolution != horizontalResolution
+            || reanalyze.blockSize != bSizeMs;
+
+        reanalyze.fftSize = fftSize;
+        reanalyze.horizontalResolution = horizontalResolution;
+        reanalyze.blockSize = bSizeMs;
+
         if (!editing.buffer.empty()) {
             editing.buffer.sampleRate = bufferSampleRate;
             AudioBufferSpectralInformation::analyze({
@@ -773,12 +765,11 @@ namespace Kaixo::Processing {
                 .blockSize = bSizeMs,
                 .progress = progress,
                 .reanalyze = reanalyze.layers[npos],
-                .start = editing.dirtyStart,
-                .end = editing.dirtyEnd
+                .start = everythingDirty ? 0.f : editing.dirtyStart,
+                .end = everythingDirty ? 1e6f : editing.dirtyEnd
             });
 
-            editing.dirtyStart = editing.buffer.size() / bufferSampleRate;
-            editing.dirtyEnd = 0;
+            editing.dirty(false);
 
             reanalyze.layers[npos].selection = selection;
             reanalyze.layers[npos].offset = { editing.delay / bufferSampleRate, editing.offset, };
@@ -794,12 +785,11 @@ namespace Kaixo::Processing {
                 .blockSize = bSizeMs,
                 .progress = progress,
                 .reanalyze = reanalyze.layers[id],
-                .start = layer.dirtyStart,
-                .end = layer.dirtyEnd
+                .start = everythingDirty ? 0.f : layer.dirtyStart,
+                .end = everythingDirty ? 1e6f : layer.dirtyEnd
             });
 
-            layer.dirtyStart = layer.buffer.size() / bufferSampleRate;
-            layer.dirtyEnd = 0;
+            layer.dirty(false);
 
             reanalyze.layers[id].selection = {
                 layer.delay / bufferSampleRate,         // Start at delay in seconds

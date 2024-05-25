@@ -42,10 +42,6 @@ namespace Kaixo::Processing {
         float loadingProgress();
 
         // ------------------------------------------------
-        
-        Processing::AudioBuffer combined();
-
-        // ------------------------------------------------
 
         std::size_t size();
         float length(); // length in seconds
@@ -81,6 +77,10 @@ namespace Kaixo::Processing {
 
             float dirtyStart = 0;
             float dirtyEnd = std::numeric_limits<float>::max();
+
+            void clear();
+            void dirty(bool isDirty);
+            void extendDirty(Point<float> minmax);
         };
 
         std::map<std::size_t, Layer> layers;

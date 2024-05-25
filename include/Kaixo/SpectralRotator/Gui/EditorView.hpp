@@ -103,6 +103,8 @@ namespace Kaixo::Gui {
 
         Rect<> selectedRect();
 
+        void move(Point<float> amount, bool remove = true);
+
         // ------------------------------------------------
         
         std::future<void> editFuture;

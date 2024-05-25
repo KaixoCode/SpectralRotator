@@ -76,10 +76,10 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        std::size_t size = settings.buffer.size();
-        std::size_t blockSize = Math::min(settings.fftSize, settings.buffer.sampleRate * (settings.blockSize / 1000.f));
-        std::size_t distanceBetweenBlocks = Math::clamp((settings.horizontalResolution / 1000.f) * settings.buffer.sampleRate, 1, size);
-        std::size_t blocks = size / distanceBetweenBlocks;
+        std::int64_t size = settings.buffer.size();
+        std::int64_t blockSize = Math::min(settings.fftSize, settings.buffer.sampleRate * (settings.blockSize / 1000.f));
+        std::int64_t distanceBetweenBlocks = Math::clamp((settings.horizontalResolution / 1000.f) * settings.buffer.sampleRate, 1, size);
+        std::int64_t blocks = size / distanceBetweenBlocks;
 
         // ------------------------------------------------
 
@@ -96,7 +96,7 @@ namespace Kaixo::Processing {
 
         auto& result = settings.reanalyze;
         result.frameSize = settings.fftSize / 2 + 1;
-        result.intensity.resize(result.frameSize * blocks);
+        result.intensity.resize(result.frameSize * blocks, -145);
         result.offset = { 0.f, 0.f };
         result.selection = { 0.f, 0.f, settings.buffer.size() / settings.buffer.sampleRate, settings.buffer.sampleRate / 2 };
         // ^^ Default selection is entire buffer

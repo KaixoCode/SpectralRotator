@@ -50,7 +50,10 @@ namespace Kaixo::Processing {
         };
 
         // ------------------------------------------------
-        
+
+        std::size_t fftSize;        // power of 2
+        float horizontalResolution; // ms
+        std::size_t blockSize;      // ms
         std::map<std::size_t, Layer> layers{};
 
         // ------------------------------------------------
@@ -68,7 +71,7 @@ namespace Kaixo::Processing {
 
             AudioBufferSpectralInformation::Layer& reanalyze;
             float start = 0;
-            float end = std::numeric_limits<float>::max();
+            float end = 1e6;
         };
 
         static void analyze(AnalyzeSettings settings);
