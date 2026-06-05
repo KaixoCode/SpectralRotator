@@ -5,23 +5,11 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/Core/Theme/Theme.hpp"
-
-// ------------------------------------------------
-
 namespace Kaixo {
 
     // ------------------------------------------------
 
-    SpectralRotatorController::SpectralRotatorController() {
-
-        // ------------------------------------------------
-
-        Gui::T.initialize();
-
-        // ------------------------------------------------
-
-    }
+    SpectralRotatorController::SpectralRotatorController() {}
 
     // ------------------------------------------------
 

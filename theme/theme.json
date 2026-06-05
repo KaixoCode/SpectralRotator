@@ -34,10 +34,8 @@
   font: $main-font
 
   background: {
-    image: {
-      source: background.png
-      edges: [28, 261, 4, 4]
-    }
+    image: background.png
+    image-edges: [28, 261, 4, 4]
   }
 
   button: {
@@ -167,14 +165,14 @@
       }
 
       background: {
-        color: [255, 255, 255, 0]
+        value: [255, 255, 255, 0]
         hovering: [255, 255, 255, 20]
       }
     }
 
     cancel: {
       background-color: {
-        color: [255, 255, 255, 0]
+        value: [255, 255, 255, 0]
         hovering: [255, 255, 255, 20]
       }
 
@@ -188,7 +186,7 @@
 
     option: {
       background-color: {
-        color: [255, 255, 255, 0]
+        value: [255, 255, 255, 0]
         hovering: [255, 255, 255, 20]
       }
 
@@ -226,9 +224,9 @@
     }
   }
 
-  rotate-90: {
+  rotate90: {
     background-color: {
-      color: [255, 255, 255, 0]
+      value: [255, 255, 255, 0]
       hovering: [255, 255, 255, 20]
     }
 
@@ -240,7 +238,7 @@
 
   flip: {
     background-color: {
-      color: [255, 255, 255, 0]
+      value: [255, 255, 255, 0]
       hovering: [255, 255, 255, 20]
     }
     
@@ -250,9 +248,9 @@
     }
   }
 
-  rotate-270: {
+  rotate270: {
     background-color: {
-      color: [255, 255, 255, 0]
+      value: [255, 255, 255, 0]
       hovering: [255, 255, 255, 20]
     }
     
@@ -264,7 +262,7 @@
 
   reverse: {
     background-color: {
-      color: [255, 255, 255, 0]
+      value: [255, 255, 255, 0]
       hovering: [255, 255, 255, 20]
     }
     

@@ -5,8 +5,8 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/Core/Storage.hpp"
 #include "Kaixo/Utils/Decoders/Decoder.hpp"
+#include "Kaixo/Core/ConfigFile.hpp"
 
 // ------------------------------------------------
 
@@ -50,12 +50,15 @@ namespace Kaixo {
     // ------------------------------------------------
 
     std::filesystem::path AudioFile::generationLocation() {
-        std::filesystem::path path = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName().toStdString();
+        std::filesystem::path path = Convert::juceStringToPath(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getFullPathName().toStdString());
         path = path / "SpectralRotator" / "generated";
         if (!std::filesystem::exists(path)) {
             std::filesystem::create_directories(path);
         }
-        return Storage::getOrDefault<std::string>("generation-directory", path.string());
+
+        std::string result;
+        Config::UserSettings->try_get_or_default<std::string>("generation-directory", result, Convert::pathToString(path));
+        return Convert::stringToPath(result);
     }
 
     // ------------------------------------------------
