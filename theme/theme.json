@@ -1,277 +1,84 @@
-{
-  
-  // ------------------------------------------------
 
-  theme-name: Default
-  
-  // ------------------------------------------------
+// ------------------------------------------------
 
-  variables: {
+theme-name: Default
 
-    // ------------------------------------------------
+// ------------------------------------------------
 
-    $main-font: {
-      map: map.png
-      description: map.json
-    }
-
-    // ------------------------------------------------
-
-    $button: {
-      background-color: {
-        color: [255, 255, 255, 0]
-        transition: 50
-        hovering: [255, 255, 255, 20]
-      }
-    }
-
-    // ------------------------------------------------
-
+variables: {
+  $transition: 100
+  $main-font: {
+    map: map.png
+    description: map.json
   }
-  
-  // ------------------------------------------------
+}
 
-  font: $main-font
+// ------------------------------------------------
 
-  background: {
-    image: background.png
-    image-edges: [28, 261, 4, 4]
-  }
+font: $main-font
 
-  button: {
+background: {
+  background-color: [15]
+}
+
+// ------------------------------------------------
+
+file: {
+  $instruction-button: {
+    image: $icon
     background-color: {
-        value: [50, 50, 50]
-        transition: 50
-        
-        hovering: [70, 70, 70]
-        pressed: [90, 90, 90]
-      }
+      transition: $transition
+      value: [255, 0]
+      hovering: [255, 10]
+    }
   }
 
-  spectrum: {
+  rotate-90: {
+    $icon: rotate-90.png
+    extends: $instruction-button
+  }
+
+  rotate-270: {
+    $icon: rotate-270.png
+    extends: $instruction-button
+  }
+
+  flip-horizontal: {
+    $icon: reverse.png
+    extends: $instruction-button
+  }
+
+  flip-vertical: {
+    $icon: flip.png
+    extends: $instruction-button
+  }
+
+  spectral-display: {
     color1: [27, 27, 27]
     color2: [60, 60, 179]
     color3: [239, 15, 0]
     color4: [255, 255, 64]
     color5: [255, 255, 255]
   }
-
-  advanced: {
-    scrollbar: {
-      background-color: [90, 90, 90]
-    }
-  }
-
-  source-background: {
-    image: {
-      source: source-background.png
-      edges: [104, 32, 4, 4]
-    }
-  }
-
-  rotate-background: {
-      image: {
-        source: rotate-background.png
-        edges: [104, 32, 4, 4]
-      }
-  }
-
-  settings: {
-    button: {
-      extends: $button
-      
-      image: {
-        source: settings.png
-        align: center
-      }
-    }
-
-    open-folder: {
-      extends: $button
-      
-      image: {
-        source: open-folder.png
-        align: center
-      }
-    }
-
-    background: {
-      image: {
-        source: settings-background.png
-        edges: [132, 28, 4, 4]
-      }
-    }
-
-    entry: {
-      extends: $button
-
-      layers: {
-        setting: {
-          text: {
-            content: $name
-            position: [4, 4]
-            align: top-left
-            font: $main-font
-            color: [211, 211, 211]
-          }
-        }
-
-        value: {
-          text: {
-            content: $value
-            position: [110, 4]
-            align: top-left
-            font: $main-font
-            color: [211, 211, 211]
-            overflow: dots
-          }
-        }
-      }
-    }
-  }
-
-  popup: {
-    background: {
-      background-color: [27, 27, 27]
-
-      text: {
-        color: [211, 211, 211]
-        font: $main-font
-        align: top-left
-        content: $text
-        position: [4, 4]
-      }
-    }
-
-    confirm: {
-      extends: $button
-
-      text: {
-        color: [211, 211, 211]
-        font: $main-font
-        align: center
-        content: $text
-      }
-    }
-
-    message: {
-      font: $main-font
-      text-color: [211, 211, 211]
-      caret-color: [211, 211, 211]
-      selection-color: [211, 211, 211, 30]
-      placeholder-color: {
-        value: [211, 211, 211]
-        focused: [0, 0, 0, 0]
-      }
-
-      background: {
-        value: [255, 255, 255, 0]
-        hovering: [255, 255, 255, 20]
-      }
-    }
-
-    cancel: {
-      background-color: {
-        value: [255, 255, 255, 0]
-        hovering: [255, 255, 255, 20]
-      }
-
-      text: {
-        color: [211, 211, 211]
-        font: $main-font
-        align: center
-        content: $text
-      }
-    }
-
-    option: {
-      background-color: {
-        value: [255, 255, 255, 0]
-        hovering: [255, 255, 255, 20]
-      }
-
-      layers: {
-        value: {
-          text: {
-            color: [211, 211, 211]
-            font: $main-font
-            content: $value
-            align: top-left
-            position: [90, 4]
-          }
-        }
-
-        name: {
-          text: {
-            color: [211, 211, 211]
-            font: $main-font
-            content: $name
-            align: top-left
-            position: [4, 4]
-          }
-        }
-      }
-    }
-  }
-
-  loading: {
-    background-color: [27, 27, 27, 60]
-    text: {
-      content: $load-type... $progress
-      align: center
-      font: $main-font
-      color: [211, 211, 211]
-    }
-  }
-
-  rotate90: {
-    background-color: {
-      value: [255, 255, 255, 0]
-      hovering: [255, 255, 255, 20]
-    }
-
-    image: {
-      source: rotate-90.png
-      align: center
-    }
-  }
-
-  flip: {
-    background-color: {
-      value: [255, 255, 255, 0]
-      hovering: [255, 255, 255, 20]
-    }
-    
-    image: {
-      source: flip.png
-      align: center
-    }
-  }
-
-  rotate270: {
-    background-color: {
-      value: [255, 255, 255, 0]
-      hovering: [255, 255, 255, 20]
-    }
-    
-    image: {
-      source: rotate-270.png
-      align: center
-    }
-  }
-
-  reverse: {
-    background-color: {
-      value: [255, 255, 255, 0]
-      hovering: [255, 255, 255, 20]
-    }
-    
-    image: {
-      source: reverse.png
-      align: center
-    }
-  }
-
-  // ------------------------------------------------
-
 }
+
+settings: {
+  $setting: {
+    layers: {
+      value: {
+        font: $main-font
+        text-color: [255]
+        text-align: top-left
+        text-position: [4, 4]
+        text: $value
+      }
+    }
+  }
+
+  fft-size: $setting
+  fft-resolution: $setting
+  fft-block-size: $setting
+  fft-range: $setting
+}
+
+// ------------------------------------------------

@@ -2,36 +2,49 @@
 
 // ------------------------------------------------
 
-#include "Kaixo/Core/Processing/Processor.hpp"
+#include "Kaixo/Core/Processing/Module.hpp"
+#include "Kaixo/Core/Processing/Resampler.hpp"
 
 // ------------------------------------------------
 
-#include "Kaixo/SpectralRotator/Controller.hpp"
-#include "Kaixo/SpectralRotator/Processing/FileHandler.hpp"
+#include "Kaixo/SpectralRotator/Processing/SafeAudioBuffer.hpp"
 
 // ------------------------------------------------
 
 namespace Kaixo::Processing {
-
+    
     // ------------------------------------------------
 
-    class SpectralRotatorProcessor : public Processor {
+    /**
+        Simple class that keeps track of a play position in a file.
+     */
+    class FilePlayer : public Module {
     public:
 
         // ------------------------------------------------
 
-        SpectralRotatorProcessor();
+        FilePlayer(SafeAudioBuffer& buffer);
+
+        // ------------------------------------------------
+
+        Stereo output;
 
         // ------------------------------------------------
 
         void process() override;
 
         // ------------------------------------------------
-        
-        FileHandler file;
-        
+
+        void play(bool play);
+        void seek(std::int64_t sample);
+
         // ------------------------------------------------
 
+    private:
+        SafeAudioBuffer& m_File;
+        std::atomic_bool m_Playing{ false };
+        std::atomic_int64_t m_PlaybackPosition{ 0 };
+        Resampler m_Resampler{};
     };
 
     // ------------------------------------------------

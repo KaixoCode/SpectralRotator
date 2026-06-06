@@ -14,13 +14,17 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     SpectralRotatorProcessor::SpectralRotatorProcessor() {
+        registerInterface<AudioBufferInterface>();
+
+        registerModule(file);
     }
 
     // ------------------------------------------------
 
     void SpectralRotatorProcessor::process() {
         for (std::size_t i = 0; i < outputBuffer().size(); ++i) {
-            outputBuffer()[i] = 0;
+            file.process();
+            outputBuffer()[i] = file.output;
         }
     }
 
