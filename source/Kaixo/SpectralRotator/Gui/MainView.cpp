@@ -45,6 +45,27 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
+    class AudioBufferChangeListener : public virtual Listener {
+    public:
+        virtual void bufferChanged() = 0;
+    };
+
+    // ------------------------------------------------
+
+    class AnalyzeResultListener : public virtual Listener {
+    public:
+        virtual void updateAnalyzeResult(const Processing::AnalyzeResult& r) = 0;
+    };
+
+    // ------------------------------------------------
+
+    class BufferZoomListener : public virtual Listener {
+    public:
+        virtual void zoomChanged(Point<float> zoom) = 0;
+    };
+
+    // ------------------------------------------------
+
     class SettingsListener : public virtual Listener {
     public:
         virtual void updateAnalyzeSettings(const Processing::AnalyzeSettings& v) = 0;
@@ -145,7 +166,7 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    struct AudioFileSpectrumImage {
+    struct AudioFileImage {
         Point<float> selection{}; // Selection in audio file that is analyzed, in millis
         juce::Image image{};
 
@@ -169,24 +190,50 @@ namespace Kaixo::Gui {
         }
     };
 
-    class SpectralDisplay : public View {
+    // ------------------------------------------------
+
+    class AudioDisplay : public View, public AudioBufferChangeListener, public BufferZoomListener {
     public:
 
         // ------------------------------------------------
 
         Processing::InterfaceStorage<Processing::AudioBufferInterface> interface = context.interface<Processing::AudioBufferInterface>();
-        Theme::Color color1 = theme()["color1"];
-        Theme::Color color2 = theme()["color2"];
-        Theme::Color color3 = theme()["color3"];
-        Theme::Color color4 = theme()["color4"];
-        Theme::Color color5 = theme()["color5"];
 
         // ------------------------------------------------
 
-        SpectralDisplay(Context c) 
-            : View(c) 
+        AudioDisplay(Context c)
+            : View(c)
         {
             wantsIdle(true);
+        }
+
+        // ------------------------------------------------
+
+        virtual void refreshImage() = 0;
+
+        // ------------------------------------------------
+
+        void bufferChanged() override {
+            m_Dirty = true;
+        }
+
+        // ------------------------------------------------
+
+        void zoomChanged(Point<float> zoom) override {
+            m_ZoomMillis = zoom;
+            m_Dirty = true;
+        }
+
+        // ------------------------------------------------
+
+        void resized() override {
+            m_Dirty = true;
+        }
+
+        // ------------------------------------------------
+
+        void paint(juce::Graphics& g) override {
+            m_Image.draw(g, localDimensions(), m_ZoomMillis);
         }
 
         // ------------------------------------------------
@@ -194,7 +241,6 @@ namespace Kaixo::Gui {
         void onIdle() {
             View::onIdle();
 
-            
             if (m_Dirty) {
                 // Only refresh every 200 millis
                 auto now = std::chrono::steady_clock::now();
@@ -206,44 +252,204 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        void paint(juce::Graphics& g) override {
-            m_Image.draw(g, localDimensions(), m_ZoomMillis);
-        }
-
-        // ------------------------------------------------
-
-        void resized() override {
-            m_Dirty = true;
-        }
-
-        // ------------------------------------------------
-
-        void updateZoom(Point<float> millis) {
-            m_ZoomMillis = millis;
-            m_Dirty = true;
-        }
-
-        void updateAnalyzeData(Processing::AnalyzeResult&& result) {
-            m_AnalyzeResult = std::move(result);
-            m_Dirty = true;
-        }
-
-        // ------------------------------------------------
-
-    private:
-        Processing::AnalyzeResult m_AnalyzeResult{};
-        AudioFileSpectrumImage m_Image{};
+    protected:
+        AudioFileImage m_Image{};
         Point<float> m_ZoomMillis{};
         std::atomic_bool m_Dirty = false;
         std::chrono::steady_clock::time_point m_LastRefresh = std::chrono::steady_clock::now();
+        
+        // ------------------------------------------------
+
+        Point<float> convertPixelsToMillis(Point<float> coord) const { return convertPixelsToMillis(coord, m_ZoomMillis); }
+        Point<float> convertMillisToPixels(Point<float> normal) const { return convertMillisToPixels(normal, m_ZoomMillis); }
+        float convertPixelsToMillis(float coord) const { return convertPixelsToMillis(coord, m_ZoomMillis); }
+        float convertMillisToPixels(float normal) const { return convertMillisToPixels(normal, m_ZoomMillis); }
+
+        Point<float> convertPixelsToMillis(Point<float> coord, Point<float> selection) const {
+            return { convertPixelsToMillis(coord.x(), selection), 1 - coord.y() / height() };
+        }
+
+        Point<float> convertMillisToPixels(Point<float> normal, Point<float> selection) const {
+            return { convertMillisToPixels(normal.x(), selection), (1 - normal.y()) * height() };
+        }
+
+        float convertPixelsToMillis(float coord, Point<float> selection) const {
+            return Math::remap(coord, 0, width(), selection.x(), selection.y());
+        }
+
+        float convertMillisToPixels(float normal, Point<float> selection) const {
+            return Math::remap(normal, selection.x(), selection.y(), 0, width());
+        }
 
         // ------------------------------------------------
 
-        void refreshImage() {
+    };
+
+    class WaveformDisplay : public AudioDisplay /* Exposes the interface, the zoom millis, pixel <> millis conversion etc.*/ {
+    public:
+
+        // ------------------------------------------------
+
+        Theme::Color stroke = theme()["stroke"];
+
+        // ------------------------------------------------
+
+        WaveformDisplay(Context c) 
+            : AudioDisplay(c)
+        {}
+
+        // ------------------------------------------------
+
+        static constexpr int SincRadius = 8;
+
+        static float sinc(float x) {
+            if (Math::abs(x) < 1.0e-6f) return 1.f;
+            x *= Math::pi;
+            return Math::sin(x) / x;
+        }
+
+        static float blackman(float x) {
+            return 0.42f + 0.5f * Math::cos(x) + 0.08f * Math::cos(2.f * x);
+        }
+
+        // ------------------------------------------------
+
+        float sampleAtSinc(float position) const {
+            auto& buffer = interface->buffer();
+
+            int center = (int)std::floor(position);
+
+            float sum = 0.f;
+            float norm = 0.f;
+
+            for (int i = -SincRadius; i <= SincRadius; ++i) {
+                int index = center + i;
+                float d = position - (float)index;
+                float w = sinc(d) * blackman(d * Math::pi / SincRadius);
+
+                float sample = buffer.read(index).average();
+
+                sum += sample * w;
+                norm += w;
+            }
+
+            return norm != 0.f ? sum / norm : 0.f;
+        }
+
+        float sampleAtLinear(float position) const {
+            float a = interface->buffer().read(static_cast<int>(position)).average();
+            float b = interface->buffer().read(static_cast<int>(position) + 1).average();
+            return Math::lerp(Math::fmod1(position), a, b);
+        }
+
+        float sampleToY(float sample) const {
+            return Math::remap(Math::clamp11(sample), -1.f, 1.f, height(), 0.f);
+        }
+
+        // ------------------------------------------------
+
+        void refreshImage() override {
+            KAIXO_DEBUG("Refreshing image with zoom {} {}.", m_ZoomMillis.x(), m_ZoomMillis.y()); 
+            m_Dirty = false;
+
+            AudioFileImage result;
+            result.image = juce::Image{ juce::Image::PixelFormat::ARGB, width(), height(), true, juce::SoftwareImageType() };
+            result.selection = m_ZoomMillis;
+
+            auto& buffer = interface->buffer();
+
+            float sampleRate = buffer.sampleRate();
+            float startMillis = m_ZoomMillis.x();
+            float endMillis = m_ZoomMillis.y();
+
+            float startSample = Convert::millisToSamples(startMillis, sampleRate); 
+            float endSample = Convert::millisToSamples(endMillis, sampleRate);
+            float visibleSamples = endSample - startSample;
+
+            float samplesPerPixel = visibleSamples / Math::max(1.f, width());
+
+            juce::Graphics g(result.image);
+            g.setColour(stroke);
+
+            // draw min/max envelope
+            if (samplesPerPixel > 4.f) {
+                for (int x = 0; x < width(); ++x) {
+                    float s0 = Math::remap(x, 0.f, width(), startSample, endSample);
+                    float s1 = Math::remap(x + 1, 0.f, width(), startSample, endSample);
+                    int start = static_cast<int>(Math::floor(s0));
+                    int end = static_cast<int>(Math::max(start + 1, Math::ceil(s1))); 
+                    
+                    float minV = 1.f;
+                    float maxV = -1.f;
+
+                    for (int i = start; i < end; ++i) {
+                        float v = buffer.read(i).average();
+
+                        minV = Math::min(minV, v);
+                        maxV = Math::max(maxV, v);
+                    }
+
+                    g.drawLine(static_cast<float>(x), sampleToY(minV), static_cast<float>(x), sampleToY(maxV), 1.f);
+                }
+            } else { // draw antialiased path
+                juce::Path path;
+
+                bool useSinc = samplesPerPixel < 1.f;
+
+                for (int x = 0; x < width(); ++x) {
+                    float samplePos = Math::remap(x, 0.f, width() - 1.f, startSample, endSample);
+                    float value = useSinc ? sampleAtSinc(samplePos) : sampleAtLinear(samplePos);
+
+                    float y = sampleToY(value);
+
+                    if (x == 0) path.startNewSubPath(static_cast<float>(x), y);
+                    else path.lineTo(static_cast<float>(x), y);
+                }
+
+                g.strokePath(path, juce::PathStrokeType(1.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+
+            m_Image = std::move(result);
+            repaint();
+        }
+
+        // ------------------------------------------------
+
+    };
+
+    // ------------------------------------------------
+
+    class SpectralDisplay : public AudioDisplay, public AnalyzeResultListener {
+    public:
+
+        // ------------------------------------------------
+
+        Theme::Color color1 = theme()["color1"];
+        Theme::Color color2 = theme()["color2"];
+        Theme::Color color3 = theme()["color3"];
+        Theme::Color color4 = theme()["color4"];
+        Theme::Color color5 = theme()["color5"];
+
+        // ------------------------------------------------
+
+        SpectralDisplay(Context c) 
+            : AudioDisplay(c)
+        {}
+
+        // ------------------------------------------------
+
+        void updateAnalyzeResult(const Processing::AnalyzeResult& r) override {
+            m_AnalyzeResult = r;
+            m_Dirty = true;
+        }
+
+        // ------------------------------------------------
+
+        void refreshImage() override {
             KAIXO_DEBUG("Refreshing image with zoom {} {}.", m_ZoomMillis.x(), m_ZoomMillis.y());
             m_Dirty = false;
 
-            AudioFileSpectrumImage result;
+            AudioFileImage result;
             result.image = juce::Image{ juce::Image::PixelFormat::RGB, width(), height(), true, juce::SoftwareImageType()};
             result.selection = m_ZoomMillis;
 
@@ -268,26 +474,265 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        Point<float> convertPixelsToMillis(Point<float> coord) const {
-            return convertPixelsToMillis(coord, m_ZoomMillis);
+    private:
+        Processing::AnalyzeResult m_AnalyzeResult{};
+
+        // ------------------------------------------------
+
+    };
+
+    // ------------------------------------------------
+
+    class LargeScrollbar : public View {
+    public:
+
+        // ------------------------------------------------
+
+        enum class Orientation {
+            Horizontal,
+            Vertical
+        };
+
+        // ------------------------------------------------
+
+        struct Settings {
+            Theme::Drawable handle;
+            std::function<void(Point<float>)> onupdate;
+
+            Orientation orientation = Orientation::Horizontal;
+
+            float minimumVisibleRange = 1.0f;
+            float edgeResizeSize = 6.0f;
+
+            bool jumpToClick = true;
+        } settings;
+
+        // ------------------------------------------------
+
+        LargeScrollbar(Context c, Settings s)
+            : View(c), settings(std::move(s))
+        {
+            if (!settings.handle) settings.handle = theme()["handle"];
         }
 
-        Point<float> convertMillisToPixels(Point<float> normal) const {
-            return convertMillisToPixels(normal, m_ZoomMillis);
+        // ------------------------------------------------
+
+        void zoomBounds(Point<float> bounds) {
+            m_MaxZoom = bounds;
+            constrainZoom();
         }
 
-        Point<float> convertPixelsToMillis(Point<float> coord, Point<float> selection) const {
-            return { 
-                Math::remap(coord.x(), 0, width(), selection.x(), selection.y()),
-                1 - coord.y() / height()
-            };
+        void zoom(Point<float> zoom) {
+            m_Zoom = zoom;
+            constrainZoom();
+            repaint();
         }
 
-        Point<float> convertMillisToPixels(Point<float> normal, Point<float> selection) const {
-            return {
-                Math::remap(normal.x(), selection.x(), selection.y(), 0, width()),
-                (1 - normal.y()) * height()
-            };
+        Point<float> zoom() const { return m_Zoom; }
+
+        // ------------------------------------------------
+
+        void mouseDown(const juce::MouseEvent& e) override {
+            View::mouseDown(e);
+
+            auto hb = handleBounds();
+
+            m_DragStartZoom = m_Zoom;
+            m_DragStartMouse = positionAxis(e.position);
+
+            if (!hb.contains(e.position)) {
+                if (settings.jumpToClick) {
+                    const auto totalRange = rangeSize(m_MaxZoom);
+                    const auto visibleRange = rangeSize(m_Zoom);
+
+                    const auto trackSize = axisLength();
+                    const auto handleSize = handleAxisSize();
+
+                    auto pos = (positionAxis(e.position) - handleSize * 0.5f) / (trackSize - handleSize);
+                    pos = Math::clamp1(pos);
+
+                    const auto maxOffset = totalRange - visibleRange;
+                    const auto start = m_MaxZoom.x() + maxOffset * pos;
+
+                    m_Zoom = { start, start + visibleRange };
+
+                    zoomUpdated();
+                    repaint();
+                }
+
+                return;
+            }
+
+            const auto axisPos = positionAxis(e.position);
+            const auto startEdge = handleStart(hb);
+            const auto endEdge = handleEnd(hb);
+
+            if (Math::abs(axisPos - startEdge) <= settings.edgeResizeSize) {
+                m_DragMode = DragMode::ResizeStart;
+            } else if (Math::abs(axisPos - endEdge) <= settings.edgeResizeSize) {
+                m_DragMode = DragMode::ResizeEnd;
+            } else {
+                m_DragMode = DragMode::Move;
+            }
+        }
+
+        void mouseDrag(const juce::MouseEvent& e) override {
+            View::mouseDrag(e);
+
+            if (m_DragMode == DragMode::None) {
+                return;
+            }
+
+            const auto totalRange = rangeSize(m_MaxZoom);
+            if (totalRange <= 0.0f) return;
+
+            const auto trackSize = axisLength();
+            if (trackSize <= 0.0f) return;
+
+            const auto deltaPixels = positionAxis(e.position) - m_DragStartMouse;
+            const auto valuePerPixel = totalRange / trackSize;
+            const auto deltaValue = deltaPixels * valuePerPixel;
+
+            switch (m_DragMode) {
+            case DragMode::Move: {
+                const auto size = rangeSize(m_DragStartZoom);
+                auto start = m_DragStartZoom.x() + deltaValue;
+                start =  Math::clamp(start, m_MaxZoom.x(), m_MaxZoom.y() - size);
+                m_Zoom = { start, start + size };
+                break;
+            }
+            case DragMode::ResizeStart: {
+                auto start = m_DragStartZoom.x() + deltaValue;
+                const auto maxStart = m_DragStartZoom.y() - settings.minimumVisibleRange;
+                start = Math::clamp(start, m_MaxZoom.x(), maxStart);
+                m_Zoom = { start, m_DragStartZoom.y() };
+                break;
+            }
+            case DragMode::ResizeEnd: {
+                auto end = m_DragStartZoom.y() + deltaValue;
+                const auto minEnd = m_DragStartZoom.x() + settings.minimumVisibleRange;
+                end = Math::clamp(end, minEnd, m_MaxZoom.y());
+                m_Zoom = { m_DragStartZoom.x(), end };
+                break;
+            }
+            default: break;
+            }
+
+            constrainZoom();
+            zoomUpdated();
+            repaint();
+        }
+
+        void mouseUp(const juce::MouseEvent& e) override {
+            View::mouseUp(e);
+            m_DragMode = DragMode::None;
+        }
+
+        // ------------------------------------------------
+
+        Rect<float> handleBounds() const {
+            const auto totalRange = rangeSize(m_MaxZoom);
+
+            if (totalRange <= 0.0f) {
+                return localDimensions().toFloat();
+            }
+
+            const auto visibleRange = rangeSize(m_Zoom);
+            const auto trackLength = axisLength();
+            const auto startNorm = (m_Zoom.x() - m_MaxZoom.x()) / totalRange;
+            const auto sizeNorm = visibleRange / totalRange;
+            const auto startPx = startNorm * trackLength;
+            const auto sizePx = sizeNorm * trackLength;
+
+            auto r = localDimensions().toFloat();
+
+            if (settings.orientation == Orientation::Horizontal) {
+                r.setX(r.getX() + startPx);
+                r.setWidth(sizePx);
+            } else {
+                r.setY(r.getY() + startPx);
+                r.setHeight(sizePx);
+            }
+
+            return r;
+        }
+
+        // ------------------------------------------------
+
+        void paint(juce::Graphics& g) override {
+            settings.handle.draw({
+                .graphics = g,
+                .view = this,
+                .context = context,
+                .bounds = handleBounds(),
+                .state = state(),
+            });
+        }
+
+        // ------------------------------------------------
+
+    private:
+        enum class DragMode {
+            None,
+            Move,
+            ResizeStart,
+            ResizeEnd
+        };
+
+        Point<float> m_MaxZoom{};
+        Point<float> m_Zoom{};
+        Point<float> m_DragStartZoom{};
+        float m_DragStartMouse = 0.0f;
+        DragMode m_DragMode = DragMode::None;
+
+        // ------------------------------------------------
+
+        static float rangeSize(Point<float> p) { return p.y() - p.x(); }
+
+        float axisLength() const {
+            return settings.orientation == Orientation::Horizontal ? width() : height();
+        }
+
+        float positionAxis(Point<float> p) const {
+            return settings.orientation == Orientation::Horizontal ? p.x() : p.y();
+        }
+
+        float handleAxisSize() const {
+            auto hb = handleBounds();
+            return settings.orientation == Orientation::Horizontal ? hb.getWidth() : hb.getHeight();
+        }
+
+        float handleStart(Rect<float> r) const {
+            return settings.orientation == Orientation::Horizontal ? r.getX() : r.getY();
+        }
+
+        float handleEnd(Rect<float> r) const {
+            return settings.orientation == Orientation::Horizontal ? r.getRight() : r.getBottom();
+        }
+
+        // ------------------------------------------------
+
+        void constrainZoom() {
+            const auto totalSize = rangeSize(m_MaxZoom);
+
+            if (totalSize <= 0.0f) {
+                return;
+            }
+
+            auto start = m_Zoom.x();
+            auto end = m_Zoom.y();
+            auto size = end - start;
+
+            size = Math::clamp(size, settings.minimumVisibleRange, totalSize);
+            start = Math::clamp(start, m_MaxZoom.x(), m_MaxZoom.y() - size);
+            end = start + size;
+
+            m_Zoom = { start, end };
+        }
+
+        void zoomUpdated() const {
+            if (settings.onupdate)
+                settings.onupdate(m_Zoom);
         }
 
         // ------------------------------------------------
@@ -296,7 +741,7 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    class FileDisplay : public View, public juce::FileDragAndDropTarget, public SettingsListener {
+    class FileDisplay : public View, public juce::FileDragAndDropTarget, public SettingsListener, public BufferZoomListener {
     public:
 
         // ------------------------------------------------
@@ -328,7 +773,14 @@ namespace Kaixo::Gui {
 
             // ------------------------------------------------
 
-            add<SpectralDisplay>("spectral-display", { 0, 20, Width, Height - 20 });
+            add<SpectralDisplay>("spectral-display", { 0, 20, Width, Height - 240 });
+            add<WaveformDisplay>("waveform-display", { 0, Height - 220, Width, 200 });
+
+            add<LargeScrollbar>("scrollbar", { 0, Height - 20, Width, 20 }, { 
+                .onupdate = [this](Point<float> zoom) {
+                    context.window().notifyListeners(&BufferZoomListener::zoomChanged, zoom);
+                }
+            });
 
             // ------------------------------------------------
 
@@ -346,7 +798,9 @@ namespace Kaixo::Gui {
             if (m_TransformFuture.valid() && m_TransformFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
                 KAIXO_DEBUG("Transform finished, notifying spectral display to refresh image.");
                 m_TransformFuture = {};
-                refresh();
+
+                context.window().notifyListeners(&AudioBufferChangeListener::bufferChanged);
+                scheduleAnalyze();
             }
 
             if (m_LoadFuture.valid() && m_LoadFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
@@ -354,34 +808,35 @@ namespace Kaixo::Gui {
                 KAIXO_DEBUG("Load finished with result '{}', notifying spectral display to refresh image.", result);
                 handleFileLoadResult(result);
                 m_LoadFuture = {};
-                resetZoom(); // Reset zoom on load.
-                refresh();
+
+                // Resets zoom on load, to show the whole file.
+                Point<float> bounds{ 0.f, 1000.f * interface->buffer().size() / interface->buffer().sampleRate() };
+                if (auto scrollbar = find<LargeScrollbar>("scrollbar")) {
+                    scrollbar->get().zoomBounds(bounds);
+                    scrollbar->get().zoom(bounds);
+                }
+
+                context.window().notifyListeners(&AudioBufferChangeListener::bufferChanged);
+                scheduleAnalyze();
             }
 
             if (m_AnalyzeFuture.valid() && m_AnalyzeFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
                 KAIXO_DEBUG("Analyze finished, notifying spectral display to refresh image.");
 
-                if (auto spectralDisplay = find<SpectralDisplay>("spectral-display")) {
-                    spectralDisplay->get().updateAnalyzeData(m_AnalyzeFuture.get());
-                }
+                context.window().notifyListeners(&AnalyzeResultListener::updateAnalyzeResult, m_AnalyzeFuture.get());
 
                 m_AnalyzeFuture = {};
             }
 
-            if (m_Dirty && !m_AnalyzeFuture.valid()) {
+            if (m_AnalyzeDirty && !m_AnalyzeFuture.valid()) {
                 doAnalyze();
             }
         }
 
         // ------------------------------------------------
 
-        void resetZoom() {
-            m_ZoomMillis = { 0.f, 1000 * interface->buffer().size() / interface->buffer().sampleRate() };
-            zoomUpdated();
-        }
-
-        void refresh() {
-            m_Dirty = true;
+        void zoomChanged(Point<float> zoom) override {
+            m_ZoomMillis = zoom;
         }
 
         // ------------------------------------------------
@@ -397,7 +852,7 @@ namespace Kaixo::Gui {
         void updateAnalyzeSettings(const Processing::AnalyzeSettings& v) override {
             KAIXO_DEBUG("Analyze settings updated!");
             m_AnalyzeSettings = v;
-            refresh();
+            scheduleAnalyze();
         }
 
         // ------------------------------------------------
@@ -407,15 +862,13 @@ namespace Kaixo::Gui {
         std::future<Processing::AnalyzeResult> m_AnalyzeFuture{};
         std::future<Processing::FileLoadResult> m_LoadFuture{};
         Point<float> m_ZoomMillis{}; // Range of the audio file that it's zoomed in on.
-        std::atomic_bool m_Dirty = false;
+        std::atomic_bool m_AnalyzeDirty = false;
         Processing::AnalyzeSettings m_AnalyzeSettings{};
 
         // ------------------------------------------------
 
-        void zoomUpdated() {
-            if (auto spectralDisplay = find<SpectralDisplay>("spectral-display")) {
-                spectralDisplay->get().updateZoom(m_ZoomMillis);
-            }
+        void scheduleAnalyze() {
+            m_AnalyzeDirty = true;
         }
 
         // ------------------------------------------------
@@ -441,7 +894,7 @@ namespace Kaixo::Gui {
                 return; // Still waiting, can't do anything right now
             }
 
-            m_Dirty = false;
+            m_AnalyzeDirty = false;
             m_AnalyzeFuture = interface->analyze(m_AnalyzeSettings);
         }
 

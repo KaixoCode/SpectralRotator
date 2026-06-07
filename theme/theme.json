@@ -54,11 +54,21 @@ file: {
   }
 
   spectral-display: {
-    color1: [27, 27, 27]
+    color1: [0, 0, 0]
     color2: [60, 60, 179]
     color3: [239, 15, 0]
     color4: [255, 255, 64]
     color5: [255, 255, 255]
+  }
+
+  waveform-display: {
+    stroke: [255]
+  }
+
+  scrollbar: {
+    handle: {
+      background-color: [255, 255, 255, 40]
+    }
   }
 }
 
