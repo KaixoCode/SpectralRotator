@@ -35,8 +35,12 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        void togglePlay();
         void play(bool play);
         void seek(std::int64_t sample);
+
+        std::int64_t playhead() const;
+        bool playing() const;
 
         // ------------------------------------------------
 

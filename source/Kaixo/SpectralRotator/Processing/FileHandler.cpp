@@ -22,8 +22,8 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
-    FileHandler::FileHandler() : m_Player(buffer) {
-        registerModule(m_Player);
+    FileHandler::FileHandler() : player(buffer) {
+        registerModule(player);
 
         m_FormatManager.registerBasicFormats();
     }
@@ -33,8 +33,8 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     void FileHandler::process() {
-        m_Player.process();
-        output = m_Player.output;
+        player.process();
+        output = player.output;
     }
 
     // ------------------------------------------------

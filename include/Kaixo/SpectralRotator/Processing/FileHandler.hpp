@@ -56,6 +56,7 @@ namespace Kaixo::Processing {
         Stereo output;
         Selection selection;
         SafeAudioBuffer buffer;
+        FilePlayer player;
 
         // ------------------------------------------------
 
@@ -116,7 +117,6 @@ namespace Kaixo::Processing {
         bool m_InSession = false;
         Selection m_CachedSelection{};
 		Transform m_CurrentTransform{ Transform::Identity };
-        FilePlayer m_Player;
         juce::AudioFormatManager m_FormatManager;
         TransformCache m_Cache{};
         Fft m_Fft{};

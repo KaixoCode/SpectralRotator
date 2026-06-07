@@ -6,11 +6,17 @@ theme-name: Default
 // ------------------------------------------------
 
 variables: {
-  $transition: 100
+  $transition: 200
   $main-font: {
     map: map.png
     description: map.json
   }
+
+  $color1: "#0387A2"
+  $color2: "#009FC0"
+  $color3: "#2B9F69"
+  $color4: "#42B97E"
+  $color5: "#ffffff"
 }
 
 // ------------------------------------------------
@@ -18,7 +24,42 @@ variables: {
 font: $main-font
 
 background: {
-  background-color: [15]
+  background-color: {
+    start: [0, 0]
+    end: [0, "$height"]
+    radial: false
+    colors: [
+      "#454546"
+      "#404042"
+    ]
+  }
+}
+
+// ------------------------------------------------
+
+show-settings: {
+  background-color: {
+    value: [255, 0]
+    hovering: [255, 40]
+  }
+}
+
+interface-dimensions: {
+  transition: 500
+  curve: ease-in-out
+  x: 8
+  y: 28
+  width: $width - 16 - $show-settings * 300
+  height: $height - 36
+}
+
+settings-dimensions: {
+  transition: 500
+  curve: ease-in-out
+  x: $width - $show-settings * 300
+  y: 20
+  width: $show-settings * 300
+  height: $height - 20
 }
 
 // ------------------------------------------------
@@ -30,6 +71,28 @@ file: {
       transition: $transition
       value: [255, 0]
       hovering: [255, 10]
+    }
+  }
+
+  selection-start: {
+    font: $main-font
+    text: $value
+    text-color: [255]
+    text-align: center-left
+  }
+
+  selection-size: {
+    font: $main-font
+    text: $value
+    text-color: [255]
+    text-align: center-left
+  }
+
+  play: {
+    background-color: {
+      value: [255, 0]
+      selected: [255, 70]
+      hovering: [255, 40]
     }
   }
 
@@ -54,31 +117,49 @@ file: {
   }
 
   spectral-display: {
-    color1: [0, 0, 0]
-    color2: [60, 60, 179]
-    color3: [239, 15, 0]
+    color1: [0, 0, 0, 255]
+    color2: [60, 60, 179, 120]
+    color3: [239, 15 , 0, 200]
     color4: [255, 255, 64]
-    color5: [255, 255, 255]
+    color5: [255]
   }
 
   waveform-display: {
-    stroke: [255]
+    stroke: "#42B97E"
+  }
+
+  scrollbar-waveform-display: {
+    stroke: "#42B97E"
   }
 
   selection: {
     start: {
+      image: start-handle.png
       layers: {
         line: {
           rect: {
-            dimensions: [0, 0, 1, "$height"]
+            dimensions: [0, 0, 2, "$height"]
             align: top-center
-            fill: [255]
+            fill: [211]
           }
         }
       }
     }
     
     end: {
+      image: end-handle.png
+      layers: {
+        line: {
+          rect: {
+            dimensions: [0, 0, 2, "$height"]
+            align: top-center
+            fill: [211]
+          }
+        }
+      }
+    }
+    
+    playhead: {
       layers: {
         line: {
           rect: {

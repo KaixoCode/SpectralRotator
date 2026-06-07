@@ -22,6 +22,23 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        // toggle play the file player.
+        void togglePlay();
+
+        // play/pause the file player.
+        void play(bool v);
+
+        // @returns true if file is playing audio.
+        bool playing();
+
+        // @returns the play position, in samples.
+        std::int64_t playhead();
+
+        // set the play position, in samples.
+        void playhead(std::int64_t i);
+
+        // ------------------------------------------------
+
         /** Get the audio buffer.
         
             @returns the audio buffer.

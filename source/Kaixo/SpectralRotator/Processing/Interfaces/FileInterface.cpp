@@ -13,6 +13,33 @@ namespace Kaixo::Processing {
     
     // ------------------------------------------------
 
+    void AudioBufferInterface::togglePlay() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.player.togglePlay();
+    }
+
+    void AudioBufferInterface::play(bool v) {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.player.play(v);
+    }
+
+    bool AudioBufferInterface::playing() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.player.playing();
+    }
+
+    std::int64_t AudioBufferInterface::playhead() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.player.playhead();
+    }
+
+    void AudioBufferInterface::playhead(std::int64_t i) {
+        auto& processor = self<SpectralRotatorProcessor>();
+        processor.file.player.seek(i);
+    }
+
+    // ------------------------------------------------
+
     const SafeAudioBuffer& AudioBufferInterface::buffer() {
         auto& processor = self<SpectralRotatorProcessor>();
         return processor.file.buffer;

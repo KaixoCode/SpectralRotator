@@ -35,8 +35,12 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
+    void FilePlayer::togglePlay() { m_Playing = !m_Playing; }
     void FilePlayer::play(bool play) { m_Playing = play; }
     void FilePlayer::seek(std::int64_t sample) { m_PlaybackPosition = sample; }
+
+    std::int64_t FilePlayer::playhead() const { return m_PlaybackPosition; }
+    bool FilePlayer::playing() const { return m_Playing; }
 
     // ------------------------------------------------
 
