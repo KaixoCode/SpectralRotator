@@ -13,7 +13,6 @@ namespace Kaixo::Processing {
     struct AnalyzeSettings {
         std::size_t fftSize = 512; // bins
         float fftResolution = 1;   // millis
-        float fftBlockSize = 50;   // millis
         float fftRange;            // decibel
     };
 

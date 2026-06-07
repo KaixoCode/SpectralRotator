@@ -87,9 +87,11 @@ namespace Kaixo::Gui {
         {
             // ------------------------------------------------
 
+            add<Button>("settings-title", { Width, 20 });
+
             add<Knob>("fft-size", { Width, 20 }, {
                 .onchange = [this](ParamValue val) { Config::UserSettings["fft-size"] = val; updateAnalyzeSettings(); },
-                .name = "FFT Size",
+                .name = "Freq Resolution",
                 .steps = 9,
                 .format = Formatters::Group<"32", "64", "128", "256", "512", "1024", "2048", "4096", "8192">,
                 .transform = Transformers::Group<9>,
@@ -98,29 +100,19 @@ namespace Kaixo::Gui {
 
             add<Knob>("fft-resolution", { Width, 20 }, {
                 .onchange = [this](ParamValue val) { Config::UserSettings["fft-resolution"] = val; updateAnalyzeSettings(); },
-                .name = "FFT Resolution",
+                .name = "Time Resolution",
                 .steps = 9,
                 .format = Formatters::Group<"0.25ms", "0.5ms", "1ms", "2ms", "4ms", "8ms", "16ms", "32ms", "64ms">,
                 .transform = Transformers::Group<9>,
                 .resetValue = Convert::indexToParam(4, 9),
             });
 
-            add<Knob>("fft-block-size", { Width, 20 }, {
-                .onchange = [this](ParamValue val) { Config::UserSettings["fft-block-size"] = val; updateAnalyzeSettings(); },
-                .name = "FFT Block Size",
-                .steps = 6,
-                .format = Formatters::Group<"5ms", "10ms", "25ms", "50ms", "75ms", "100ms">,
-                .transform = Transformers::Group<6>,
-                .resetValue = Convert::indexToParam(4, 6),
-            });
-
             add<Knob>("fft-range", { Width, 20 }, {
                 .onchange = [this](ParamValue val) { Config::UserSettings["fft-range"] = val; updateAnalyzeSettings(); },
-                .name = "FFT Range",
-                .steps = 6,
+                .name = "Dynamic Range",
                 .format = Formatters::Decibels,
                 .transform = Transformers::Range<48.f, 144.f>,
-                .resetValue = Transformers::Range<48.f, 144.f>.normalize(100.f),
+                .resetValue = Transformers::Range<48.f, 144.f>.normalize(75.f),
             });
 
             // ------------------------------------------------
@@ -158,12 +150,6 @@ namespace Kaixo::Gui {
                 constexpr float Values[]{ 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64 };
                 if (auto knob = find<Knob>("fft-resolution")) knob->get().value(*fftReso);
                 analyzeSettings.fftResolution = Values[Math::clamp(Convert::paramToIndex(*fftReso, 9), 0, 8)];
-            }
-            
-            if (auto fftBlockSize = Config::UserSettings["fft-block-size"].get<float>()) {
-                constexpr float Values[]{ 5, 10, 25, 50, 75, 100 };
-                if (auto knob = find<Knob>("fft-block-size")) knob->get().value(*fftBlockSize);
-                analyzeSettings.fftBlockSize = Values[Math::clamp(Convert::paramToIndex(*fftBlockSize, 6), 0, 5)];
             }
             
             if (auto fftRange = Config::UserSettings["fft-range"].get<float>()) {
@@ -988,7 +974,7 @@ namespace Kaixo::Gui {
                 break;
             }
             case DragMode::Playhead: {
-                interface->playhead(sample);
+                interface->playhead(Math::clamp(sample, 0, size));
                 break;
             }
             case DragMode::Start: {
@@ -1213,7 +1199,7 @@ namespace Kaixo::Gui {
 
                 if (type == Type::Start) {
                     auto newStart = Math::round(interface->selection().start + difference);
-                    newStart = Math::clamp(newStart, 0, static_cast<std::int64_t>(interface->timelineLength()) - interface->selection().size - 1);
+                    newStart = Math::clamp(newStart, 0, static_cast<std::int64_t>(interface->timelineLength()) - interface->selection().size);
 
                     interface->selection().start = newStart;
                 } else {
@@ -1624,7 +1610,7 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
         
         context.window().setResizable(true, false);
-        context.window().setResizeLimits(650, 350, 10000, 10000);
+        context.window().setResizeLimits(700, 350, 10000, 10000);
 
         // ------------------------------------------------
 

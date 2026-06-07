@@ -6,13 +6,13 @@ theme-name: Default
 // ------------------------------------------------
 
 variables: {
-  $transition: 200
+  $transition: 50
   $main-font: {
     font: font.ttf
     size: 16
   }
 
-  $hue: 149
+  $hue: 200
   $sat: 10
 
   $button: {
@@ -24,7 +24,7 @@ variables: {
     background-color: {
       transition: $transition
       value: [255, 0]
-      hovering: [255, 10]
+      hovering: [255, 20]
     }
   }
 }
@@ -52,16 +52,16 @@ interface-dimensions: {
   curve: ease-in-out
   x: 8
   y: 8
-  width: $width - 16 - $show-settings * 300
+  width: $width - 16 - $show-settings * max(270, $width / 4)
   height: $height - 16
 }
 
 settings-dimensions: {
   transition: 500
   curve: ease-in-out
-  x: $width - $show-settings * 300
+  x: $width - $show-settings * max(270, $width / 4)
   y: 8
-  width: $show-settings * 300
+  width: $show-settings * max(270, $width / 4)
   height: $height - 16
 }
 
@@ -130,6 +130,12 @@ file: {
           { hsl: ["$hue", "$sat", 19] }
         ]
       }
+    }, {
+      dimensions: [39, 5, 1, 20]
+      fill: [211]
+    }, {
+      dimensions: [179, 5, 1, 20]
+      fill: [211]
     }]
   }
 
@@ -202,12 +208,6 @@ file: {
     background: {
       rects: [{
         x: $select-start
-        y: 20
-        width: $select-end - $select-start
-        height: $height - 20
-        fill: { hsl: ["$hue", "$sat", 50], a: 50 }
-      }, {
-        x: $select-start
         y: 0
         width: $select-end - $select-start
         height: 20
@@ -260,19 +260,50 @@ file: {
 }
 
 settings: {
-  background: {}
+  background: {
+    rects: [{
+      dimensions: [0, 0, "$width - 8", "$height"]
+      fill: {
+        start: [0, 0]
+        end: ["$width", "$height"]
+        radial: false
+        colors: [
+          { hsl: ["$hue", "$sat", 20] }
+          { hsl: ["$hue", "$sat", 23] }
+          { hsl: ["$hue", "$sat", 20] }
+          { hsl: ["$hue", "$sat", 19] }
+          { hsl: ["$hue", "$sat", 21] }
+        ]
+      }
+    }]
+  }
   $setting: {
+    
+    background-color: {
+      transition: $transition
+      value: [255, 0]
+      hovering: [255, 10]
+    }
+    
     font: $main-font
     text-align: top-left
     text-color: [255]
 
     texts: [{
-      position: [124, 0]
+      position: [120, 0]
       text: $value
     }, {
-      position: [4, 0]
+      position: [0, 0]
       text: $name
     }]
+  }
+
+  settings-title: {
+    font: $main-font
+    text-align: top-left
+    text-color: [255]
+    position: [0, 0]
+    text: Settings
   }
 
   fft-size: $setting
@@ -280,17 +311,24 @@ settings: {
   fft-block-size: $setting
   fft-range: $setting
   generation-directory: {
+    
+    background-color: {
+      transition: $transition
+      value: [255, 0]
+      hovering: [255, 10]
+    }
+
     font: $main-font
     text-align: top-left
     text-color: [255]
     
     texts: [{
-      position: [124, 0]
+      position: [55, 0]
       text-overflow: dots
       text: $text
     }, {
-      position: [4, 0]
-      text: Output Folder
+      position: [0, 0]
+      text: Output:
     }]
   }
 }
