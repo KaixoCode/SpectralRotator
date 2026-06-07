@@ -90,6 +90,7 @@ namespace Kaixo::Processing {
                 // so start of the file is the start of our selection.
                 selection.start = 0;
                 buffer.startOffset = 0;
+                m_IdentityBufferOffset = 0;
                 m_TimelineLength = newBuffer.getNumSamples();
 
                 sampleRate = static_cast<float>(reader->sampleRate);
@@ -208,7 +209,7 @@ namespace Kaixo::Processing {
     std::future<void> FileHandler::transform(TransformInstruction t) {
         KAIXO_DEBUG("Added transform '{}' to activity queue.", t);
 
-        return m_ActivityWorker.push([this, t, select = selection] {
+        return m_ActivityWorker.push([this, t, select = selection] mutable {
             std::lock_guard lock{ m_Mutex };
 
             KAIXO_DEBUG("Doing transform '{}' with selection [{}, {}].", t, select.start, select.size);
@@ -223,38 +224,23 @@ namespace Kaixo::Processing {
                 return; // Should exist...
             }
 
-            if (m_CachedSelection != selection) { // New selection
-                KAIXO_DEBUG("New selection [{}, {}].", selection.start, selection.size);
+            if (m_CachedSelection != select) { // New selection
+                KAIXO_DEBUG("New selection [{}, {}].", select.start, select.size);
+                m_CachedSelection = select;
 
                 if (m_CurrentTransform == Transform::Identity) {
                     KAIXO_DEBUG("Identity transform, so just clear other cached transforms.");
-                    m_CachedSelection = selection;
                     m_Cache.clearExceptIdentity();
                 } else {
                     KAIXO_DEBUG("Non-identity transform, start a new session, with current buffer as Identity.");
+                    m_CurrentTransform = Transform::Identity;
                     m_Cache.invalidate();
                     m_LoadedFile.clear(); // No longer from a loaded file.
-                
+                    
+                    m_IdentityBufferOffset = buffer.startOffset.load();
                     buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
                         m_Cache.store(Transform::Identity, bfr);
-                        m_CurrentTransform = Transform::Identity;
-
-                        float startDifference = selection.start - buffer.startOffset;
-                        if (startDifference > 0) { // Starts after the buffer start
-                            KAIXO_DEBUG("Selection started after the start of the buffer, with margin {}", startDifference);
-                            selection.start = startDifference;
-                            selection.size = Math::max(selection.size, buffer.size() - startDifference);
-                            buffer.startOffset = 0;
-                        } else { // Starts before the buffer start
-                            KAIXO_DEBUG("Selection started before the start of the buffer, with margin {}", startDifference);
-                            selection.start = 0;
-                            selection.size = Math::max(selection.size + startDifference, 1);
-                            buffer.startOffset = 0;
-                        }
                     });
-
-                    m_TimelineLength = buffer.size();
-                    m_CachedSelection = selection;
                 }
             }
 
@@ -281,19 +267,21 @@ namespace Kaixo::Processing {
 
                 if (!m_Cache.contains(Transform::Mirror90)) {
                     KAIXO_DEBUG("Cache does not contain Mirror90, generation it and adding it to cache.");
-                    performFft(select, m_Cache.get(Transform::Identity));
+                    performFft({ select.start - m_IdentityBufferOffset, select.size }, m_Cache.get(Transform::Identity));
                 }
 
                 performTransform(Transform::Mirror90, ops, { 0, select.size }, m_Cache.get(Transform::Mirror90));
             } else {
-                performTransform(Transform::Identity, ops, select, m_Cache.get(Transform::Identity));
+                performTransform(Transform::Identity, ops, { select.start - m_IdentityBufferOffset, select.size }, m_Cache.get(Transform::Identity));
             }
 
             if (m_CurrentTransform == Transform::Identity) {
-                buffer.startOffset = 0;
+                buffer.startOffset = m_IdentityBufferOffset.load();
             } else {
                 buffer.startOffset = select.start;
             }
+
+            selection = select;
 
             notifyStateChanged();
         });

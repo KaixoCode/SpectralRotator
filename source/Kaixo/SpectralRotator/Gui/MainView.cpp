@@ -125,10 +125,24 @@ namespace Kaixo::Gui {
 
             // ------------------------------------------------
 
+            auto& gen = add<Button>("generation-directory", { Width, 20 }, {
+                .callback = [this](bool) { chooseGenerationDirectory(); },
+            });
+
+            Config::UserSettings["generation-directory"].try_get(gen.settings.text);
+
+            // ------------------------------------------------
+
             updateAnalyzeSettings();
 
             // ------------------------------------------------
 
+        }
+
+        // ------------------------------------------------
+
+        void resized() override {
+            positionChildren();
         }
 
         // ------------------------------------------------
@@ -159,6 +173,31 @@ namespace Kaixo::Gui {
 
             context.window().notifyListeners(&SettingsListener::updateAnalyzeSettings, analyzeSettings);
         }
+
+        // ------------------------------------------------
+
+        void chooseGenerationDirectory() {
+            auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories;
+
+            chooser = std::make_unique<juce::FileChooser>("Select a directory...", juce::File{}, "*");
+
+            chooser->launchAsync(flags,
+                [this](const juce::FileChooser& fc) {
+                    auto file = fc.getResult();
+                    if (!file.existsAsFile()) return;
+                   
+                    Config::UserSettings["generation-directory"] = file.getFullPathName().toStdString();
+
+                    if (auto btn = find<Button>("generation-directory")) {
+                        btn->get().settings.text = file.getFullPathName().toStdString();
+                    }
+                });
+        }
+
+        // ------------------------------------------------
+
+    private:
+        std::unique_ptr<juce::FileChooser> chooser;
 
         // ------------------------------------------------
 
@@ -322,7 +361,7 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        static constexpr int SincRadius = 8;
+        static constexpr int SincRadius = 16;
 
         static float sinc(float x) {
             if (Math::abs(x) < 1.0e-6f) return 1.f;
@@ -431,6 +470,19 @@ namespace Kaixo::Gui {
                 }
 
                 g.strokePath(path, juce::PathStrokeType(1.f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+                if (samplesPerPixel < 0.125f) {
+                    for (int sample = startSample; sample < endSample; ++sample) {
+                        float a = interface->buffer().read(sample).average();
+
+                        float millis = Convert::samplesToMillis(sample, sampleRate);
+
+                        float x = Math::remap(sample, startSample, endSample, 0, width());
+                        float y = sampleToY(a);
+
+                        g.fillEllipse({ x - 2, y - 2, 4, 4 });
+                    }
+                }
             }
 
             return result;
@@ -537,6 +589,8 @@ namespace Kaixo::Gui {
             : View(c), settings(std::move(s))
         {
             if (!settings.handle) settings.handle = theme()["handle"];
+
+            animation(settings.handle);
         }
 
         // ------------------------------------------------
@@ -772,14 +826,17 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
         
         std::size_t handleWidth = 20;
-        std::size_t minimumSelectionSize = 1;
+        std::size_t topHeight = 20;
+        std::int64_t minimumSelectionSize = 1;
         bool clampToBuffer = true;
 
         // ------------------------------------------------
 
+        Theme::Drawable background = theme()["background"];
         Theme::Drawable start = theme()["start"];
         Theme::Drawable playhead = theme()["playhead"];
         Theme::Drawable end = theme()["end"];
+        Theme::Drawable foreground = theme()["foreground"];
 
         // ------------------------------------------------
 
@@ -800,6 +857,9 @@ namespace Kaixo::Gui {
                 repaint();
             });
 
+            animation(start);
+            animation(playhead);
+            animation(end);
             wantsIdle(true);
         }
 
@@ -820,11 +880,28 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
 
         void paint(juce::Graphics& g) override {
+            auto startPos = startHandlePosition();
+            auto endPos = endHandlePosition();
+            auto playPos = playheadPosition();
+
+            background.draw({
+                .graphics = g,
+                .view = this,
+                .context = context,
+                .bounds = localDimensions(),
+                .values{
+                    { "$select-start", startPos.centerX() },
+                    { "$select-end",   endPos.centerX()   },
+                    { "$playhead",     playPos.centerX()  },
+                },
+                .state = state(),
+            });
+
             start.draw({
                 .graphics = g,
                 .view = this,
                 .context = context,
-                .bounds = startHandlePosition(),
+                .bounds = startPos,
                 .state = state(),
             });
 
@@ -832,7 +909,7 @@ namespace Kaixo::Gui {
                 .graphics = g,
                 .view = this,
                 .context = context,
-                .bounds = playheadPosition(),
+                .bounds = playPos,
                 .state = state(),
             });
 
@@ -840,17 +917,33 @@ namespace Kaixo::Gui {
                 .graphics = g,
                 .view = this,
                 .context = context,
-                .bounds = endHandlePosition(),
+                .bounds = endPos,
                 .state = state(),
             });
+            
+            foreground.draw({
+                .graphics = g,
+                .view = this,
+                .context = context,
+                .bounds = localDimensions(),
+                .values{
+                    { "$select-start", startPos.centerX() },
+                    { "$select-end",   endPos.centerX()   },
+                    { "$playhead",     playPos.centerX()  },
+                },
+                .state = state(),
+            });
+
         }
 
         // ------------------------------------------------
 
         void mouseDown(const juce::MouseEvent& e) override {
             m_DragMode = DragMode::None; 
-            
-            if (endHandlePosition().contains(e.position)) {
+
+            if (topDragablePosition().contains(e.position)) {
+                m_DragMode = DragMode::Drag;
+            } else if (endHandlePosition().contains(e.position)) {
                 m_DragMode = DragMode::End;
             } else if (startHandlePosition().contains(e.position)) {
                 m_DragMode = DragMode::Start;
@@ -861,7 +954,6 @@ namespace Kaixo::Gui {
             }
 
             m_DragStart = m_Selection;
-            m_DesiredSize = m_Selection.size;
         }
 
         void mouseUp(const juce::MouseEvent&) override {
@@ -869,7 +961,9 @@ namespace Kaixo::Gui {
         }
 
         void mouseMove(const juce::MouseEvent& e) override {
-            if (endHandlePosition().contains(e.position)) {
+            if (topDragablePosition().contains(e.position)) {
+                setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+            } else if (endHandlePosition().contains(e.position)) {
                 setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
             } else if (startHandlePosition().contains(e.position)) {
                 setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
@@ -883,25 +977,31 @@ namespace Kaixo::Gui {
                 return;
             }
 
-            const auto size = bufferSize();
-            const auto sample = xToSample(e.position.x);
+            auto size = bufferSize();
+            auto sample = xToSample(e.position.x);
 
             switch (m_DragMode) {
+            case DragMode::Drag: {
+                auto startSample = xToSample(e.mouseDownPosition.x);
+                auto relativeSample = sample - startSample;
+                m_Selection.start = Math::clamp(m_DragStart.start + relativeSample, 0, size - m_Selection.size);
+                break;
+            }
             case DragMode::Playhead: {
                 interface->playhead(sample);
                 break;
             }
             case DragMode::Start: {
-                std::size_t desiredEnd = sample + m_DesiredSize;
-
-                if (desiredEnd > size) {
-                    desiredEnd = size;
+                if (sample >= m_Selection.end() - minimumSelectionSize) {
+                    sample = m_Selection.end() - minimumSelectionSize;
                 }
 
-                const std::size_t actualSize = (desiredEnd > sample) ? desiredEnd - sample : minimumSelectionSize;
+                if (sample < 0) {
+                    sample = 0;
+                }
 
-                m_Selection.start = Math::clamp(sample, std::size_t(0), size - 1);
-                m_Selection.size = std::max(actualSize, minimumSelectionSize);
+                m_Selection.start = sample;
+                m_Selection.size = m_DragStart.end() - sample;
                 break;
             }
             case DragMode::End: {
@@ -910,8 +1010,6 @@ namespace Kaixo::Gui {
                 } else {
                     m_Selection.size = Math::max(minimumSelectionSize, sample - m_Selection.start);
                 }
-
-                m_DesiredSize = m_Selection.size;
                 break;
             }
 
@@ -929,56 +1027,49 @@ namespace Kaixo::Gui {
             None,
             Start,
             Playhead,
+            Drag,
             End
         };
 
         DragMode m_DragMode = DragMode::None;
         Processing::Selection m_Selection;
         Processing::Selection m_DragStart; 
-        std::size_t m_DesiredSize = 0;
         Point<float> m_Zoom;
 
         // ------------------------------------------------
 
-        std::size_t bufferSize() const { return interface->timelineLength(); }
-        std::size_t sampleRate() const { return interface->buffer().sampleRate(); }
+        std::int64_t bufferSize() const { return static_cast<std::int64_t>(interface->timelineLength()); }
+        float sampleRate() const { return interface->buffer().sampleRate(); }
 
         // ------------------------------------------------
 
-        float zoomStartMs() const { return m_Zoom.x(); }
-        float zoomEndMs()   const { return m_Zoom.y(); }
-        float zoomSpanMs()  const { return m_Zoom.y() - m_Zoom.x(); }
+        std::int64_t zoomStart() const { return Convert::millisToSamples(m_Zoom.x(), interface->buffer().sampleRate()); }
+        std::int64_t zoomEnd()   const { return Convert::millisToSamples(m_Zoom.y(), interface->buffer().sampleRate()); }
+        std::int64_t zoomSpan()  const { return Convert::millisToSamples(m_Zoom.y() - m_Zoom.x(), interface->buffer().sampleRate()); }
 
         // ------------------------------------------------
 
-        float sampleToX(std::size_t sample) const {
-            const float sr = sampleRate();
-            const float ms = Convert::samplesToMillis(sample, sr);
-
-            const auto span = zoomSpanMs();
-            if (span <= 0.0f) {
-                return 0.0f;
-            }
-
-            const auto norm = (ms - zoomStartMs()) / span;
-
-            return norm * width();
+        float sampleToX(std::int64_t sample) const {
+            return Math::remap(sample, zoomStart(), zoomEnd(), 0.f, width());
         }
 
-        std::size_t xToSample(float x) const {
-            const auto w = width();
-
-            if (w <= 0.0f) {
-                return 0;
-            }
-
-            const auto norm = Math::clamp1(x / w);
-            const auto ms = zoomStartMs() + norm * zoomSpanMs();
-
-            return Convert::millisToSamples(ms, sampleRate());
+        std::int64_t xToSample(float x) const {
+            return Math::remap(x, 0.f, width(), zoomStart(), zoomEnd());
         }
 
         // ------------------------------------------------
+
+        Rect<float> topDragablePosition() {
+            const auto x1 = sampleToX(m_Selection.start);
+            const auto x2 = sampleToX(m_Selection.start + m_Selection.size);
+
+            return {
+                x1,
+                0.0f,
+                static_cast<float>(x2 - x1),
+                static_cast<float>(topHeight)
+            };
+        }
 
         Rect<float> startHandlePosition() {
             const auto x = sampleToX(m_Selection.start);
@@ -1060,6 +1151,8 @@ namespace Kaixo::Gui {
         SelectionKnob(Context c, Type t)
             : View(c), type(t)
         {
+            animation(graphics);
+
             watch<std::int64_t>([this] {
                 if (type == Type::Start) return interface->selection().start;
                 return interface->selection().size;
@@ -1119,9 +1212,12 @@ namespace Kaixo::Gui {
                               (m_PreviousMousePosition.x() - event.x) * -1.f;
 
                 if (type == Type::Start) {
-                    interface->selection().start = Math::round(interface->selection().start + difference);
+                    auto newStart = Math::round(interface->selection().start + difference);
+                    newStart = Math::clamp(newStart, 0, static_cast<std::int64_t>(interface->timelineLength()) - interface->selection().size - 1);
+
+                    interface->selection().start = newStart;
                 } else {
-                    interface->selection().size = Math::round(interface->selection().size + difference);
+                    interface->selection().size = Math::max(Math::round(interface->selection().size + difference), 1);
                 }
                 
                 interface->selection().size = Math::min(interface->selection().size, interface->timelineLength() - interface->selection().start);
@@ -1171,6 +1267,8 @@ namespace Kaixo::Gui {
         FileDragHandle(Context c)
             : View(c)
         {
+            setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+            animation(graphics);
             wantsIdle(true);
         }
 
@@ -1240,27 +1338,23 @@ namespace Kaixo::Gui {
 
             // ------------------------------------------------
 
-            add<FileDragHandle>("file-drag", { 0, 0, 20, 20 });
-
-            add<Button>("rotate-90", { 20, 0, 20, 20 }, {
-                .callback = [this](bool) { doTransform(Processing::TransformInstruction::Rotate90); }
-            });
-
-            add<Button>("rotate-270", { 40, 0, 20, 20 }, {
-                .callback = [this](bool) { doTransform(Processing::TransformInstruction::Rotate270); }
-            });
-
-            add<Button>("flip-horizontal", { 60, 0, 20, 20 }, {
-                .callback = [this](bool) { doTransform(Processing::TransformInstruction::FlipHorizontal); }
-            });
-
-            add<Button>("flip-vertical", { 80, 0, 20, 20 }, {
-                .callback = [this](bool) { doTransform(Processing::TransformInstruction::FlipVertical); }
-            });
+            add<ImageView>("background"sv);
 
             // ------------------------------------------------
 
-            auto& playBtn = add<Button>("play", { 100, 0, 20, 20 }, {
+            float sectionPadding = 20;
+            float buttonWidth = 30;
+            float buttonHeight = 30;
+            float selectionWidth = 80;
+            float waveformHeight = 100;
+            float scrollbarHeight = 40;
+            float selectionHeight = 20;
+
+            float x = 0;
+
+            // ------------------------------------------------
+
+            auto& playBtn = add<Button>("play", { x, 0, buttonWidth, buttonHeight }, {
                 .callback = [this](bool v) { interface->play(v); },
                 .behaviour = Button::Behaviour::Toggle
             });
@@ -1272,25 +1366,70 @@ namespace Kaixo::Gui {
                 playBtn.repaint();
             });
 
+            x += buttonWidth;
+
             // ------------------------------------------------
 
-            add<SelectionKnob>("selection-start", { 120, 0, 80, 20 }, SelectionKnob::Type::Start);
-            add<SelectionKnob>("selection-size", { 200, 0, 80, 20 }, SelectionKnob::Type::Size);
-            
+            x += sectionPadding;
+
             // ------------------------------------------------
 
-            add<SpectralDisplay>("spectral-display", { 0, 20, Width, Height - 160 });
-            add<WaveformDisplay>("waveform-display", { 0, Height - 140, Width, 100 });
+            add<Button>("rotate-90", { x, 0, buttonWidth, buttonHeight }, {
+                .callback = [this](bool) { doTransform(Processing::TransformInstruction::Rotate90); }
+            });
 
-            add<WaveformDisplay>("scrollbar-waveform-display", { 0, Height - 40, Width, 40 }).enableZoom(false);
+            x += buttonWidth;
 
-            add<LargeScrollbar>("scrollbar", { 0, Height - 40, Width, 40 }, {
+            add<Button>("rotate-270", { x, 0, buttonWidth, buttonHeight }, {
+                .callback = [this](bool) { doTransform(Processing::TransformInstruction::Rotate270); }
+            });
+
+            x += buttonWidth;
+
+            add<Button>("flip-horizontal", { x, 0, buttonWidth, buttonHeight }, {
+                .callback = [this](bool) { doTransform(Processing::TransformInstruction::FlipHorizontal); }
+            });
+
+            x += buttonWidth;
+
+            add<Button>("flip-vertical", { x, 0, buttonWidth, buttonHeight }, {
+                .callback = [this](bool) { doTransform(Processing::TransformInstruction::FlipVertical); }
+            });
+
+            x += buttonWidth;
+
+            // ------------------------------------------------
+
+            x += sectionPadding;
+
+            // ------------------------------------------------
+
+            add<SelectionKnob>("selection-start", { x, 0, selectionWidth, buttonHeight }, SelectionKnob::Type::Start);
+
+            x += selectionWidth;
+
+            add<SelectionKnob>("selection-size", { x, 0, selectionWidth, buttonHeight }, SelectionKnob::Type::Size);
+
+            x += selectionWidth;
+
+            // ------------------------------------------------
+
+            add<FileDragHandle>("file-drag", { Width - (2 * buttonWidth), 0, buttonWidth, buttonHeight });
+
+            // ------------------------------------------------
+
+            add<SpectralDisplay>("spectral-display", { 0, buttonHeight + selectionHeight, Width, Height - (buttonHeight + selectionHeight + waveformHeight + scrollbarHeight) });
+            add<WaveformDisplay>("waveform-display", { 0, Height - (waveformHeight + scrollbarHeight), Width, waveformHeight });
+
+            add<WaveformDisplay>("scrollbar-waveform-display", { 0, Height - scrollbarHeight, Width, scrollbarHeight }).enableZoom(false);
+
+            add<LargeScrollbar>("scrollbar", { 0, Height - scrollbarHeight, Width, scrollbarHeight }, {
                 .onupdate = [this](Point<float> zoom) {
                     context.window().notifyListeners(&BufferZoomListener::zoomChanged, zoom);
                 }
             });
 
-            add<SelectionDisplay>("selection", { 0, 20, Width, Height - 60 });
+            add<SelectionDisplay>("selection", { 0, buttonHeight, Width, Height - (buttonHeight + scrollbarHeight) });
 
             // ------------------------------------------------
 
@@ -1485,7 +1624,7 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
         
         context.window().setResizable(true, false);
-        context.window().setResizeLimits(400, 239, 10000, 10000);
+        context.window().setResizeLimits(650, 350, 10000, 10000);
 
         // ------------------------------------------------
 
@@ -1493,12 +1632,15 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        add<FileDisplay>("file"sv).useDimensions(false);
-        add<SettingsView>("settings"sv).useDimensions(false);
+        auto& file = add<FileDisplay>("file"sv);
+        auto& settings = add<SettingsView>("settings"sv);
+        
+        file.useDimensions(false);
+        settings.useDimensions(false);
 
         // ------------------------------------------------
         
-        add<Button>("show-settings", { 0, 0, 20, 20 }, {
+        file.add<Button>("show-settings", { Width - 30, 0, 30, 30 }, {
             .callback = [this](bool v) { m_ShowSettings = v; },
             .behaviour = Button::Behaviour::Toggle,
             .text = "Settings",

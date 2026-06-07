@@ -8,15 +8,25 @@ theme-name: Default
 variables: {
   $transition: 200
   $main-font: {
-    map: map.png
-    description: map.json
+    font: font.ttf
+    size: 16
   }
 
-  $color1: "#0387A2"
-  $color2: "#009FC0"
-  $color3: "#2B9F69"
-  $color4: "#42B97E"
-  $color5: "#ffffff"
+  $hue: 149
+  $sat: 10
+
+  $button: {
+    image: $icon
+    edges: [1, 1, 1, 1]
+    image-clip: [0, 0, 772, 772]
+    image-position: [0, 0, 20, 20]
+    image-align: center
+    background-color: {
+      transition: $transition
+      value: [255, 0]
+      hovering: [255, 10]
+    }
+  }
 }
 
 // ------------------------------------------------
@@ -29,63 +39,105 @@ background: {
     end: [0, "$height"]
     radial: false
     colors: [
-      "#454546"
-      "#404042"
+      { hsl: ["$hue", "$sat", 9] }
+      { hsl: ["$hue", "$sat", 10] }
     ]
   }
 }
 
 // ------------------------------------------------
 
-show-settings: {
-  background-color: {
-    value: [255, 0]
-    hovering: [255, 40]
-  }
-}
-
 interface-dimensions: {
   transition: 500
   curve: ease-in-out
   x: 8
-  y: 28
+  y: 8
   width: $width - 16 - $show-settings * 300
-  height: $height - 36
+  height: $height - 16
 }
 
 settings-dimensions: {
   transition: 500
   curve: ease-in-out
   x: $width - $show-settings * 300
-  y: 20
+  y: 8
   width: $show-settings * 300
-  height: $height - 20
+  height: $height - 16
 }
 
 // ------------------------------------------------
 
 file: {
-  $instruction-button: {
-    image: $icon
-    background-color: {
-      transition: $transition
-      value: [255, 0]
-      hovering: [255, 10]
+  show-settings: {
+    $icon: {
+      value: settings.png
+      selected: close-settings.png
     }
+    extends: $button
   }
 
-  file-drag: {
-    image: drag-icon.png
-    background-color: {
-      value: [255, 0]
-      hovering: [255, 40]
-    }
+  background: {
+    rects: [{
+      dimensions: [0, 0, "$width", 30]
+      fill: {
+        start: [0, 0]
+        end: ["$width", "$height"]
+        radial: false
+        colors: [
+          { hsl: ["$hue", "$sat", 20] }
+          { hsl: ["$hue", "$sat", 23] }
+          { hsl: ["$hue", "$sat", 20] }
+          { hsl: ["$hue", "$sat", 17] }
+          { hsl: ["$hue", "$sat", 21] }
+        ]
+      }
+    }, {
+      dimensions: [0, 30, "$width", "20"]
+      fill: { 
+        start: [0, 0]
+        end: ["$width", 0]
+        radial: false
+        colors: [
+          { hsl: ["$hue", "$sat", 15] }
+          { hsl: ["$hue", "$sat", 12] }
+          { hsl: ["$hue", "$sat", 13] }
+        ]
+      }
+    }, {
+      dimensions: [0, 50, "$width", "$height - 190"]
+      fill: [0]
+    }, {
+      dimensions: [0, "$height - 140", "$width", 100]
+      fill: {
+        start: [0, 0]
+        end: [0, "$height"]
+        radial: false
+        colors: [
+          { hsl: ["$hue", "$sat", 12] }
+          { hsl: ["$hue", "$sat", 18] }
+          { hsl: ["$hue", "$sat", 15] }
+        ]
+      }
+    }, {
+      dimensions: [0, "$height - 40", "$width", "40"]
+      fill: {
+        start: [0, 0]
+        end: ["$width", 0]
+        radial: false
+        colors: [
+          { hsl: ["$hue", "$sat", 19] }
+          { hsl: ["$hue", "$sat", 18] }
+          { hsl: ["$hue", "$sat", 19] }
+        ]
+      }
+    }]
   }
 
   selection-start: {
     font: $main-font
     text: $value
     text-color: [255]
+    text-position: [4, 0]
     text-align: center-left
   }
 
@@ -93,35 +145,41 @@ file: {
     font: $main-font
     text: $value
     text-color: [255]
+    text-position: [4, 0]
     text-align: center-left
   }
 
+  file-drag: {
+    $icon: drag-icon.png
+    extends: $button
+  }
+
   play: {
-    background-color: {
-      value: [255, 0]
-      selected: [255, 70]
-      hovering: [255, 40]
+    $icon: {
+      value: play-icon.png
+      selected: pause-icon.png
     }
+    extends: $button
   }
 
   rotate-90: {
     $icon: rotate-90.png
-    extends: $instruction-button
+    extends: $button
   }
 
   rotate-270: {
     $icon: rotate-270.png
-    extends: $instruction-button
+    extends: $button
   }
 
   flip-horizontal: {
     $icon: reverse.png
-    extends: $instruction-button
+    extends: $button
   }
 
   flip-vertical: {
     $icon: flip.png
-    extends: $instruction-button
+    extends: $button
   }
 
   spectral-display: {
@@ -133,77 +191,108 @@ file: {
   }
 
   waveform-display: {
-    stroke: "#42B97E"
+    stroke: { hsl: ["$hue", "$sat * 5", 60] }
   }
 
   scrollbar-waveform-display: {
-    stroke: "#42B97E"
+    stroke: { hsl: ["$hue", "$sat * 5", 60] }
   }
 
   selection: {
-    start: {
-      image: start-handle.png
+    background: {
+      rects: [{
+        x: $select-start
+        y: 20
+        width: $select-end - $select-start
+        height: $height - 20
+        fill: { hsl: ["$hue", "$sat", 50], a: 50 }
+      }, {
+        x: $select-start
+        y: 0
+        width: $select-end - $select-start
+        height: 20
+        fill: { hsl: ["$hue", "$sat", 50] }
+      }]
+    }
+
+    $handle: {
+      image: $icon
+      image-color: { hsl: ["$hue", "$sat", 80] }
       layers: {
         line: {
           rect: {
             dimensions: [0, 0, 2, "$height"]
             align: top-center
-            fill: [211]
+            fill: { hsl: ["$hue", "$sat * 5", 80] }
           }
         }
       }
+    }
+
+    start: {
+      $icon: start-handle.png
+      extends: $handle
     }
     
     end: {
-      image: end-handle.png
-      layers: {
-        line: {
-          rect: {
-            dimensions: [0, 0, 2, "$height"]
-            align: top-center
-            fill: [211]
-          }
-        }
-      }
+      $icon: end-handle.png
+      extends: $handle
     }
     
     playhead: {
-      layers: {
-        line: {
-          rect: {
-            dimensions: [0, 0, 1, "$height"]
-            align: top-center
-            fill: [255]
-          }
-        }
-      }
+      image: playhead.png
+      image-color: { hsl: ["$hue", "$sat", 80] }
+      image-edges: [9, 9, 10, 2]
     }
   }
 
   scrollbar: {
     handle: {
-      background-color: [255, 255, 255, 40]
+      rect: {
+        stroke: { hsl: ["$hue", "$sat * 5", 80] }
+        fill: { hsl: ["$hue", "$sat", 50], a: 50 }
+        stroke-weight: 2
+        border-radius: 5
+        dimensions: [0, 0, "$width", "$height"]
+      }
     }
   }
 }
 
 settings: {
+  background: {}
   $setting: {
-    layers: {
-      value: {
-        font: $main-font
-        text-color: [255]
-        text-align: top-left
-        text-position: [4, 4]
-        text: $value
-      }
-    }
+    font: $main-font
+    text-align: top-left
+    text-color: [255]
+
+    texts: [{
+      position: [124, 0]
+      text: $value
+    }, {
+      position: [4, 0]
+      text: $name
+    }]
   }
 
   fft-size: $setting
   fft-resolution: $setting
   fft-block-size: $setting
   fft-range: $setting
+  generation-directory: {
+    font: $main-font
+    text-align: top-left
+    text-color: [255]
+    
+    texts: [{
+      position: [124, 0]
+      text-overflow: dots
+      text: $text
+    }, {
+      position: [4, 0]
+      text: Output Folder
+    }]
+  }
 }
 
 // ------------------------------------------------

@@ -31,7 +31,7 @@ namespace Kaixo::Processing {
         std::int64_t start{};
         std::int64_t size{};
 
-        std::size_t end() const { return start + size; }
+        std::int64_t end() const { return start + size; }
 
         bool operator==(const Selection& o) const { return o.start == start && o.size == size; }
     };
@@ -130,6 +130,7 @@ namespace Kaixo::Processing {
         std::atomic_size_t m_StateCounter = 0;
         cxxpool::thread_pool m_ActivityWorker{ 1 };
         std::atomic_size_t m_TimelineLength = 0;
+        std::atomic_int64_t m_IdentityBufferOffset = 0;
         std::filesystem::path m_LoadedFile{};
         std::filesystem::path m_SavedFile{};
         std::string m_OriginalFileName{};
