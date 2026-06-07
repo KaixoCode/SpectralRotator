@@ -123,6 +123,13 @@ namespace Kaixo::Processing {
          */
         void performTransform(Transform start, TransformOperation ops, Selection select, const juce::AudioBuffer<float>& buffer);
 
+        /** Performs a single FFT on the buffer, and saves it to the cache as Transform::Rotate90
+
+            @param select           the selection of samples in the buffer.
+			@param buffer           the buffer to perform the transform on.
+         */
+        void performFft(Selection select, const juce::AudioBuffer<float>& buffer);
+
         // ------------------------------------------------
 
         void notifyStateChanged();

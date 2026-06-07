@@ -100,6 +100,7 @@ namespace Kaixo::Processing {
                 m_Cache.invalidate();
                 // new buffer is the new identity, as all new rotations will go from here.
                 m_Cache.store(Transform::Identity, bfr);
+                m_CurrentTransform = Transform::Identity;
             });
 
             notifyStateChanged();
@@ -142,45 +143,30 @@ namespace Kaixo::Processing {
             }
 
             TransformOperation ops{};
+            bool startFromFft = false;
             switch (m_CurrentTransform) {
-            case Transform::Identity: return; // Shouldn't occur, identity is always in the cache.
-            case Transform::Rotate90:  ops = TransformOperation::Fft | TransformOperation::ReverseInput; break;
-            case Transform::Rotate180: ops = TransformOperation::Flip | TransformOperation::ReverseInput; break;
-            case Transform::Rotate270: ops = TransformOperation::Fft | TransformOperation::ReverseOutput; break;
-            case Transform::Mirror:    ops = TransformOperation::ReverseInput; break;
-            case Transform::Mirror90:  ops = TransformOperation::Fft; break;
+            case Transform::Identity:  return; // Shouldn't occur, identity is always in the cache.
+            case Transform::Rotate90:  startFromFft = true; ops = TransformOperation::Flip; break;
+            case Transform::Rotate180: ops = TransformOperation::Flip | TransformOperation::Reverse; break;
+            case Transform::Rotate270: startFromFft = true; ops = TransformOperation::Reverse; break;
+            case Transform::Mirror:    ops = TransformOperation::Reverse; break;
+            case Transform::Mirror90:  startFromFft = true; break;
             case Transform::Mirror180: ops = TransformOperation::Flip; break;
-            case Transform::Mirror270: ops = TransformOperation::Fft | TransformOperation::ReverseInput | TransformOperation::ReverseOutput; break;
+            case Transform::Mirror270: startFromFft = true; ops = TransformOperation::Flip | TransformOperation::Reverse; break;
             }
 
-            // Special case if we need to do an FFT, but we already have a cached version that did an FFT.
-            //if (static_cast<bool>(ops & TransformOperation::Fft)) {
-            //    if (m_Cache.contains(Transform::Rotate90)) {
-            //        KAIXO_DEBUG("Transform requires an FFT, found Rotate90 in cache, starting from there.");
-            //        performTransform(Transform::Rotate90, ops - TransformOperation::Fft, select, m_Cache.get(Transform::Rotate90));
-            //        return;
-            //    }
+            if (startFromFft) {
+                KAIXO_DEBUG("Transform requires an FFT. Using Mirror90 from cache as a starting point.");
 
-            //    if (m_Cache.contains(Transform::Mirror90)) {
-            //        KAIXO_DEBUG("Transform requires an FFT, found Mirror90 in cache, starting from there.");
-            //        performTransform(Transform::Mirror90, ops - TransformOperation::Fft, select, m_Cache.get(Transform::Mirror90));
-            //        return;
-            //    }
+                if (!m_Cache.contains(Transform::Mirror90)) {
+                    KAIXO_DEBUG("Cache does not contain Mirror90, generation it and adding it to cache.");
+                    performFft(select, m_Cache.get(Transform::Identity));
+                }
 
-            //    if (m_Cache.contains(Transform::Rotate270)) {
-            //        KAIXO_DEBUG("Transform requires an FFT, found Rotate270 in cache, starting from there.");
-            //        performTransform(Transform::Rotate270, ops - TransformOperation::Fft, select, m_Cache.get(Transform::Rotate270));
-            //        return;
-            //    }
-
-            //    if (m_Cache.contains(Transform::Mirror270)) {
-            //        KAIXO_DEBUG("Transform requires an FFT, found Mirror270 in cache, starting from there.");
-            //        performTransform(Transform::Mirror270, ops - TransformOperation::Fft, select, m_Cache.get(Transform::Mirror270));
-            //        return;
-            //    }
-            //}
-
-            performTransform(Transform::Identity, ops, select, m_Cache.get(Transform::Identity));
+                performTransform(Transform::Mirror90, ops, select, m_Cache.get(Transform::Mirror90));
+            } else {
+                performTransform(Transform::Identity, ops, select, m_Cache.get(Transform::Identity));
+            }
         });
     }
 
@@ -274,98 +260,109 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     void FileHandler::performTransform(Transform start, TransformOperation ops, Selection select, const juce::AudioBuffer<float>& from) {
+
+        // ------------------------------------------------
+
         juce::AudioBuffer<float> result{ from.getNumChannels(), static_cast<int>(select.size) };
 
-		bool doFft = static_cast<bool>(ops & TransformOperation::Fft);
-		bool doFlip = static_cast<bool>(ops & TransformOperation::Flip);
-        bool reverseInput = static_cast<bool>(ops & TransformOperation::ReverseInput);
-        bool reverseOutput = static_cast<bool>(ops & TransformOperation::ReverseOutput);
+        // ------------------------------------------------
+
+		bool doFlip    = static_cast<bool>(ops & TransformOperation::Flip);
+        bool doReverse = static_cast<bool>(ops & TransformOperation::Reverse);
+
+        // ------------------------------------------------
+
+        if (!doFlip && !doReverse) {
+            KAIXO_DEBUG("PerformTransform was called without operations, copying buffer directly.");
+
+            buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) { bfr = from; });
+            notifyStateChanged();
+            return;
+        }
+
+        // ------------------------------------------------
 
         KAIXO_DEBUG("Performing transform '{}' with starting transform '{}'", ops, start);
 
-        auto read = [&](int channel, int index) {
-            int i = static_cast<int>(reverseInput ? select.end() - 1 - index : select.start + index);
-                
-            if (i >= 0 && i < from.getNumSamples()) {
-                return from.getSample(channel, i);
-			}
-
-            return 0.f;
-		};
+        // ------------------------------------------------
 
 		for (int channel = 0; channel < result.getNumChannels(); ++channel) {
             for (int i = 0; i < result.getNumSamples(); ++i) {
-                result.setSample(channel, i, read(channel, i));
-            }
-        }
+                const int relativeIndex = select.start + i;
+                const int index = static_cast<int>(doReverse ? select.end() - 1 - relativeIndex : relativeIndex);
 
-        if (reverseInput) {
-            start += TransformOperation::ReverseInput;
-            m_Cache.store(start, result);
-        }
-
-        if (doFlip) {
-            // Spectral flip can be achieved by ring modulating with Nyquist
-            for (int channel = 0; channel < result.getNumChannels(); ++channel) {
-                for (int i = 0; i < result.getNumSamples(); ++i) {
-                    auto sample = result.getSample(channel, i);
-                    if (i % 2 == 0) {
-                        result.setSample(channel, i, sample);
-                    } else {
-                        result.setSample(channel, i, -sample);
-                    }
+                float sample = 0.f;
+                if (index >= 0 && index < from.getNumSamples()) {
+                    sample = from.getSample(channel, index);
                 }
-			}
 
-            start += TransformOperation::Flip;
-            m_Cache.store(start, result);
-        }
-
-        if (doFft) {
-            std::vector<std::vector<std::complex<float>>> complexBuffer{
-                static_cast<std::size_t>(result.getNumChannels()), 
-                std::vector<std::complex<float>>(static_cast<std::size_t>(result.getNumSamples() * 2 - 1))
-            };
-
-            for (int channel = 0; channel < result.getNumChannels(); ++channel) {
-                for (int i = 0; i < result.getNumSamples(); ++i) {
-                    complexBuffer[channel][i] = result.getSample(channel, i);
+                if (doFlip) { // Spectral flip can be achieved by ring modulating with Nyquist
+                    result.setSample(channel, i, i % 2 == 0 ? sample : -sample);
+                } else {
+                    result.setSample(channel, i, sample);
                 }
             }
-
-            for (auto& channel : complexBuffer) {
-                m_Fft.transform(channel, true);
-            }
-
-            for (int channel = 0; channel < result.getNumChannels(); ++channel) {
-                for (int i = 0; i < result.getNumSamples(); ++i) {
-                    result.setSample(channel, i, complexBuffer[channel][i].real());
-                }
-            }
-
-            start += TransformOperation::Fft;
-            m_Cache.store(start, result);
         }
 
-        if (reverseOutput) {
-            start += TransformOperation::ReverseOutput;
-            m_Cache.store(start, result);
+        // ------------------------------------------------
 
-            for (int channel = 0; channel < result.getNumChannels(); ++channel) {
-                for (int i = 0; i < result.getNumSamples() / 2; ++i) {
-                    auto sampleA = result.getSample(channel, i);
-                    auto sampleB = result.getSample(channel, result.getNumSamples() - 1 - i);
-                    result.setSample(channel, i, sampleB);
-                    result.setSample(channel, result.getNumSamples() - 1 - i, sampleA);
-                }
-			}
-        }
-
-        buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) {
-            bfr = result;
-        });
-
+        buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) { bfr = result; });
         notifyStateChanged();
+
+        // ------------------------------------------------
+
+    }
+
+    void FileHandler::performFft(Selection select, const juce::AudioBuffer<float>& from) {
+
+        // ------------------------------------------------
+
+        KAIXO_DEBUG("Performing FFT on buffer, and saving as Mirror270");
+
+        // ------------------------------------------------
+
+        juce::AudioBuffer<float> result{ from.getNumChannels(), static_cast<int>(select.size) };
+
+        std::vector<std::vector<std::complex<float>>> complexBuffer{
+            static_cast<std::size_t>(from.getNumChannels()), 
+            std::vector<std::complex<float>>(static_cast<std::size_t>(select.size * 2 - 1))
+        };
+
+        // ------------------------------------------------
+
+        for (int channel = 0; channel < from.getNumChannels(); ++channel) {
+            for (int i = 0; i < select.size; ++i) {
+                const int index = select.start + i;
+
+                float sample = 0.f;
+                if (index >= 0 && index < from.getNumSamples()) {
+                    sample = from.getSample(channel, i);
+                }
+
+                complexBuffer[channel][i] = sample;
+            }
+        }
+
+        // ------------------------------------------------
+
+        for (auto& channel : complexBuffer) {
+            m_Fft.transform(channel, true);
+        }
+
+        // ------------------------------------------------
+
+        for (int channel = 0; channel < result.getNumChannels(); ++channel) {
+            for (int i = 0; i < result.getNumSamples(); ++i) {
+                result.setSample(channel, i, complexBuffer[channel][i].real());
+            }
+        }
+
+        // ------------------------------------------------
+
+        m_Cache.store(Transform::Mirror90, result);
+
+        // ------------------------------------------------
+
     }
 
     // ------------------------------------------------

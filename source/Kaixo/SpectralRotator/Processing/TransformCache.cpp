@@ -8,54 +8,27 @@
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
-    
+
     Transform operator+(Transform a, TransformInstruction b) {
+        auto t = static_cast<std::uint8_t>(a);
+
+        auto m = t & 0b100;      // mirror bit
+        auto r = t & 0b011;      // rotation 0..3
+
         switch (b) {
-        case TransformInstruction::Rotate90: {
-			auto mirrored = static_cast<std::uint8_t>(a) & 0b100;
-            auto rotated = (static_cast<std::uint8_t>(a) + (mirrored ? 3 : 1)) & 0b011;
-			return static_cast<Transform>(rotated | mirrored);
-        }
-        case TransformInstruction::Rotate180: {
-			auto mirrored = static_cast<std::uint8_t>(a) & 0b100;
-            auto rotated = (static_cast<std::uint8_t>(a) + 2) & 0b011;
-			return static_cast<Transform>(rotated | mirrored);
-        }
-        case TransformInstruction::Rotate270: {
-			auto mirrored = static_cast<std::uint8_t>(a) & 0b100;
-            auto rotated = (static_cast<std::uint8_t>(a) + (mirrored ? 1 : 3)) & 0b011;
-			return static_cast<Transform>(rotated | mirrored);
-        }
-        case TransformInstruction::FlipHorizontal: {
-			return static_cast<Transform>(static_cast<std::uint8_t>(a) ^ 0b100);
-        }
-        case TransformInstruction::FlipVertical: {
-            auto mirrored = (static_cast<std::uint8_t>(a) ^ 0b100) & 0b100;
-            auto rotated = (static_cast<std::uint8_t>(a) + 2) & 0b011;
-            return static_cast<Transform>(rotated | mirrored);
-        }
+        case TransformInstruction::Rotate90:  return static_cast<Transform>(m | ((r + 1) & 0b11));
+        case TransformInstruction::Rotate180: return static_cast<Transform>(m | ((r + 2) & 0b11));
+        case TransformInstruction::Rotate270: return static_cast<Transform>(m | ((r + 3) & 0b11));
+        case TransformInstruction::FlipHorizontal: 
+            return static_cast<Transform>((m ^ 0b100) | ((-static_cast<int>(r)) & 0b11));
+        case TransformInstruction::FlipVertical:
+            return static_cast<Transform>((m ^ 0b100) | ((-(static_cast<int>(r) + 2)) & 0b11));
         }
 
         return a;
     }
 
     Transform& operator+=(Transform& a, TransformInstruction b) { return a = a + b; }
-
-    Transform operator+(Transform a, TransformOperation b) {
-        const bool reverseInput = static_cast<bool>(b & TransformOperation::ReverseInput);
-        const bool reverseOutput = static_cast<bool>(b & TransformOperation::ReverseOutput);
-        const bool doFlip = static_cast<bool>(b & TransformOperation::Flip);
-        const bool doFft = static_cast<bool>(b & TransformOperation::Fft);
-
-        if (reverseInput) a += TransformInstruction::FlipHorizontal;
-        if (doFlip) a += TransformInstruction::FlipVertical;
-        if (doFft) a += TransformInstruction::Rotate90;
-        if (reverseOutput) a += TransformInstruction::FlipHorizontal;
-
-        return a;
-    }
-
-    Transform& operator+=(Transform& a, TransformOperation b) { return a = a + b; }
 
     // ------------------------------------------------
 

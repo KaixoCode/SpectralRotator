@@ -84,10 +84,8 @@ namespace Kaixo::Processing {
         Operations supported directly by the transform system.
      */
     enum class TransformOperation {
-        ReverseInput  = 0b0001,
-        ReverseOutput = 0b0010,
-        Fft           = 0b0100,
-        Flip          = 0b1000,
+        Reverse  = 0b01,
+        Flip     = 0b10,
     };
 
     /**
@@ -117,8 +115,6 @@ namespace Kaixo::Processing {
 
     Transform operator+(Transform a, TransformInstruction b);
     Transform& operator+=(Transform& a, TransformInstruction b);
-    Transform operator+(Transform a, TransformOperation b);
-    Transform& operator+=(Transform& a, TransformOperation b);
 
     // ------------------------------------------------
 
@@ -204,15 +200,11 @@ struct std::formatter<Kaixo::Processing::TransformOperation> : std::formatter<st
 
         std::stringstream result{};
 
-        bool hasFft           = static_cast<std::uint8_t>(t) & static_cast<std::uint8_t>(Kaixo::Processing::TransformOperation::Fft);
-        bool hasFlip          = static_cast<std::uint8_t>(t) & static_cast<std::uint8_t>(Kaixo::Processing::TransformOperation::Flip);
-        bool hasReverseInput  = static_cast<std::uint8_t>(t) & static_cast<std::uint8_t>(Kaixo::Processing::TransformOperation::ReverseInput);
-        bool hasReverseOutput = static_cast<std::uint8_t>(t) & static_cast<std::uint8_t>(Kaixo::Processing::TransformOperation::ReverseOutput);
+        bool hasFlip    = static_cast<std::uint8_t>(t) & static_cast<std::uint8_t>(Kaixo::Processing::TransformOperation::Flip);
+        bool hasReverse = static_cast<std::uint8_t>(t) & static_cast<std::uint8_t>(Kaixo::Processing::TransformOperation::Reverse);
 
-        if (hasReverseInput)  result << "ReverseInput | ";
-        if (hasFlip)          result << "Flip | ";
-        if (hasFft)           result << "Fft | ";
-        if (hasReverseOutput) result << "ReverseOutput | ";
+        if (hasReverse)  result << "Reverse | ";
+        if (hasFlip)     result << "Flip | ";
 
         std::string str = result.str();
         if (str.empty()) str = "Identity";
