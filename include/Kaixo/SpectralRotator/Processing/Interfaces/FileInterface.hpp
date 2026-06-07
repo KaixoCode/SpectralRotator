@@ -111,6 +111,14 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        /** Queue the audio buffer to save to file.
+
+            @returns the file path it saved to, or empty if failed.
+         */
+        std::future<std::filesystem::path> save();
+
+        // ------------------------------------------------
+
     };
 
     // ------------------------------------------------

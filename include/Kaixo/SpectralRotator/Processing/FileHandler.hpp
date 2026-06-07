@@ -75,6 +75,13 @@ namespace Kaixo::Processing {
          */
         std::future<FileLoadResult> load(std::filesystem::path path);
 
+        /** Save the audio buffer to the folder configured in the user settings,
+            and return the path to the file.
+            
+			@returns the path to the file containing the current audio buffer.
+         */
+        std::future<std::filesystem::path> save();
+
         // ------------------------------------------------
 
         /** Transform the buffer with a transform instruction.
@@ -123,6 +130,9 @@ namespace Kaixo::Processing {
         std::atomic_size_t m_StateCounter = 0;
         cxxpool::thread_pool m_ActivityWorker{ 1 };
         std::atomic_size_t m_TimelineLength = 0;
+        std::filesystem::path m_LoadedFile{};
+        std::filesystem::path m_SavedFile{};
+        std::string m_OriginalFileName{};
 
         // ------------------------------------------------
 

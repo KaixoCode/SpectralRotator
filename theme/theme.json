@@ -74,6 +74,14 @@ file: {
     }
   }
 
+  file-drag: {
+    image: drag-icon.png
+    background-color: {
+      value: [255, 0]
+      hovering: [255, 40]
+    }
+  }
+
   selection-start: {
     font: $main-font
     text: $value

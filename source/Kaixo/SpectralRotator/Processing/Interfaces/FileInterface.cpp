@@ -95,6 +95,13 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
+    std::future<std::filesystem::path> AudioBufferInterface::save() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.save();
+    }
+
+    // ------------------------------------------------
+
 }
 
 // ------------------------------------------------

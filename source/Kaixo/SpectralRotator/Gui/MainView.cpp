@@ -1155,6 +1155,76 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
+    class FileDragHandle : public View, private juce::DragAndDropContainer {
+    public:
+
+        // ------------------------------------------------
+
+        Processing::InterfaceStorage<Processing::AudioBufferInterface> interface = context.interface<Processing::AudioBufferInterface>();
+
+        // ------------------------------------------------
+
+        Theme::Drawable graphics = theme();
+
+        // ------------------------------------------------
+
+        FileDragHandle(Context c)
+            : View(c)
+        {
+            wantsIdle(true);
+        }
+
+        // ------------------------------------------------
+
+        void paint(juce::Graphics& g) override {
+            graphics.draw({
+                .graphics = g,
+                .view = this,
+                .context = context,
+                .bounds = localDimensions(),
+                .state = state(),
+            });
+        }
+
+        void onIdle() override {
+            View::onIdle();
+
+            if (!m_FileFuture.valid()) {
+                return;
+            }
+
+            if (m_FileFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                auto path = m_FileFuture.get();
+                m_FileFuture = {};
+
+                if (path.empty()) {
+                    return; // failed export
+                }
+
+                m_PendingFile = path;
+
+                DragAndDropContainer::performExternalDragDropOfFiles({ Convert::pathToJuceString(m_PendingFile) }, true);
+            }
+        }
+
+        // ------------------------------------------------
+
+        void mouseDown(const juce::MouseEvent&) override {
+            m_FileFuture = interface->save();
+        }
+
+        // ------------------------------------------------
+
+    private:
+        std::future<std::filesystem::path> m_FileFuture{};
+        std::filesystem::path m_PendingFile{};
+
+        // ------------------------------------------------
+
+    };
+
+    // ------------------------------------------------
+
     class FileDisplay : public View, public juce::FileDragAndDropTarget, public SettingsListener, public BufferZoomListener {
     public:
 
@@ -1170,25 +1240,27 @@ namespace Kaixo::Gui {
 
             // ------------------------------------------------
 
-            add<Button>("rotate-90", { 0, 0, 20, 20 }, {
+            add<FileDragHandle>("file-drag", { 0, 0, 20, 20 });
+
+            add<Button>("rotate-90", { 20, 0, 20, 20 }, {
                 .callback = [this](bool) { doTransform(Processing::TransformInstruction::Rotate90); }
             });
 
-            add<Button>("rotate-270", { 20, 0, 20, 20 }, {
+            add<Button>("rotate-270", { 40, 0, 20, 20 }, {
                 .callback = [this](bool) { doTransform(Processing::TransformInstruction::Rotate270); }
             });
 
-            add<Button>("flip-horizontal", { 40, 0, 20, 20 }, {
+            add<Button>("flip-horizontal", { 60, 0, 20, 20 }, {
                 .callback = [this](bool) { doTransform(Processing::TransformInstruction::FlipHorizontal); }
             });
 
-            add<Button>("flip-vertical", { 60, 0, 20, 20 }, {
+            add<Button>("flip-vertical", { 80, 0, 20, 20 }, {
                 .callback = [this](bool) { doTransform(Processing::TransformInstruction::FlipVertical); }
             });
 
             // ------------------------------------------------
 
-            auto& playBtn = add<Button>("play", { 80, 0, 20, 20 }, {
+            auto& playBtn = add<Button>("play", { 100, 0, 20, 20 }, {
                 .callback = [this](bool v) { interface->play(v); },
                 .behaviour = Button::Behaviour::Toggle
             });
@@ -1202,8 +1274,8 @@ namespace Kaixo::Gui {
 
             // ------------------------------------------------
 
-            add<SelectionKnob>("selection-start", { 100, 0, 80, 20 }, SelectionKnob::Type::Start);
-            add<SelectionKnob>("selection-size", { 180, 0, 80, 20 }, SelectionKnob::Type::Size);
+            add<SelectionKnob>("selection-start", { 120, 0, 80, 20 }, SelectionKnob::Type::Start);
+            add<SelectionKnob>("selection-size", { 200, 0, 80, 20 }, SelectionKnob::Type::Size);
             
             // ------------------------------------------------
 

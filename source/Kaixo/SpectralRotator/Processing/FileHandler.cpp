@@ -5,6 +5,7 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/Core/ConfigFile.hpp"
 #include "Kaixo/Core/Processing/Processor.hpp"
 #include "Kaixo/Core/Processing/ParameterDatabase.hpp"
 #include "Kaixo/Core/Processing/Resampler.hpp"
@@ -106,9 +107,99 @@ namespace Kaixo::Processing {
                 m_CurrentTransform = Transform::Identity;
             });
 
+            m_LoadedFile = path;
+            m_SavedFile = path;
+            m_OriginalFileName = Convert::pathToString(path.stem());
+
             notifyStateChanged();
 
             return FileLoadResult::Success;
+        });
+    }
+
+    /** Save the audio buffer to the folder configured in the user settings,
+        and return the path to the file.
+
+        @returns the path to the file containing the current audio buffer.
+     */
+    std::future<std::filesystem::path> FileHandler::save() {
+        return m_ActivityWorker.push([this] {
+            std::lock_guard lock{ m_Mutex };
+
+            KAIXO_DEBUG("Saving current buffer to file.");
+
+            if (m_CurrentTransform == Transform::Identity && 
+                !m_LoadedFile.empty() &&
+                std::filesystem::exists(m_LoadedFile)) 
+            {
+                KAIXO_DEBUG("Buffer came from file and is Identity transform, use original file path '{}'.", Convert::pathToString(m_LoadedFile));
+                return m_LoadedFile;
+            }
+
+            if (!m_SavedFile.empty() &&
+                std::filesystem::exists(m_SavedFile)) 
+            {
+                KAIXO_DEBUG("Buffer was already saved before, using path '{}'.", Convert::pathToString(m_SavedFile));
+                return m_SavedFile;
+            }
+
+            auto generationDir = Config::UserSettings["generation-directory"].get<std::string>();
+            if (!generationDir) {
+                KAIXO_ERROR("Unable to save, no generation directory set!");
+                return std::filesystem::path{};
+            }
+
+            std::string timestamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+            std::string filename = m_OriginalFileName;
+            switch (m_CurrentTransform) {
+            case Transform::Identity:  break;
+            case Transform::Rotate90:  filename = filename + "-90"; break;
+            case Transform::Rotate180: filename = filename + "-180"; break;
+            case Transform::Rotate270: filename = filename + "-270"; break;
+            case Transform::Mirror:    filename = filename + "-reversed"; break;
+            case Transform::Mirror90:  filename = filename + "-90-reversed"; break;
+            case Transform::Mirror180: filename = filename + "-flipped"; break;
+            case Transform::Mirror270: filename = filename + "-270-reversed"; break;
+            }
+
+            std::filesystem::path path = Convert::stringToPath(generationDir.value()) / (filename + "-" + timestamp + ".wav");
+
+            juce::File file = Convert::pathToJuceString(path);
+            file.getParentDirectory().createDirectory(); // ensure folder exists
+            juce::FileOutputStream* fileStream = new juce::FileOutputStream(file);
+
+            if (!fileStream->openedOk()) {
+                KAIXO_ERROR("Failed to open file to save to '{}'.", Convert::pathToString(path));
+                return std::filesystem::path{};
+            }
+
+            juce::AudioBuffer<float> audio{};
+            auto sampleRate = buffer.sampleRate();
+            buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) {
+                audio = bfr;
+            });
+
+            juce::WavAudioFormat wavFormat{};
+            std::unique_ptr<juce::AudioFormatWriter> writer{
+                wavFormat.createWriterFor(fileStream, sampleRate, (unsigned int)audio.getNumChannels(), 16, {}, 0) 
+            };
+
+            if (writer == nullptr) {
+                KAIXO_ERROR("Failed to open writer to save to path '{}'.", Convert::pathToString(path));
+                return std::filesystem::path{};
+            }
+
+            fileStream->setPosition(0); // JUCE requirement in some cases
+            bool ok = writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples());
+
+            if (!ok) {
+                KAIXO_ERROR("Failed to write audio to path '{}'.", Convert::pathToString(path));
+                return std::filesystem::path{};
+            }
+
+            m_SavedFile = path;
+
+            return path;
         });
     }
 
@@ -116,45 +207,6 @@ namespace Kaixo::Processing {
 
     std::future<void> FileHandler::transform(TransformInstruction t) {
         KAIXO_DEBUG("Added transform '{}' to activity queue.", t);
-
-        if (!m_Cache.contains(Transform::Identity)) {
-            KAIXO_ERROR("Trying to do a transform '{}', but the cache doesn't contain the identity transform.", t);
-            return {};
-        }
-
-        if (m_CachedSelection != selection) { // New selection
-            KAIXO_DEBUG("New selection [{}, {}].", selection.start, selection.size);
-
-            if (m_CurrentTransform == Transform::Identity) {
-                KAIXO_DEBUG("Identity transform, so just clear other cached transforms.");
-                m_CachedSelection = selection;
-                m_Cache.clearExceptIdentity();
-            } else {
-                KAIXO_DEBUG("Non-identity transform, start a new session, with current buffer as Identity.");
-                m_Cache.invalidate();
-
-                buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
-                    m_Cache.store(Transform::Identity, bfr);
-                    m_CurrentTransform = Transform::Identity;
-
-                    float startDifference = selection.start - buffer.startOffset;
-                    if (startDifference > 0) { // Starts after the buffer start
-                        KAIXO_DEBUG("Selection started after the start of the buffer, with margin {}", startDifference);
-                        selection.start = startDifference;
-                        selection.size = Math::max(selection.size, buffer.size() - startDifference);
-                        buffer.startOffset = 0;
-                    } else { // Starts before the buffer start
-                        KAIXO_DEBUG("Selection started before the start of the buffer, with margin {}", startDifference);
-                        selection.start = 0;
-                        selection.size = Math::max(selection.size + startDifference, 1);
-                        buffer.startOffset = 0;
-                    }
-                });
-
-                m_TimelineLength = buffer.size();
-                m_CachedSelection = selection;
-            }
-        }
 
         return m_ActivityWorker.push([this, t, select = selection] {
             std::lock_guard lock{ m_Mutex };
@@ -170,6 +222,43 @@ namespace Kaixo::Processing {
                 KAIXO_ERROR("Trying to do a transform '{}', but the cache doesn't contain the identity transform.", t);
                 return; // Should exist...
             }
+
+            if (m_CachedSelection != selection) { // New selection
+                KAIXO_DEBUG("New selection [{}, {}].", selection.start, selection.size);
+
+                if (m_CurrentTransform == Transform::Identity) {
+                    KAIXO_DEBUG("Identity transform, so just clear other cached transforms.");
+                    m_CachedSelection = selection;
+                    m_Cache.clearExceptIdentity();
+                } else {
+                    KAIXO_DEBUG("Non-identity transform, start a new session, with current buffer as Identity.");
+                    m_Cache.invalidate();
+                    m_LoadedFile.clear(); // No longer from a loaded file.
+                
+                    buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
+                        m_Cache.store(Transform::Identity, bfr);
+                        m_CurrentTransform = Transform::Identity;
+
+                        float startDifference = selection.start - buffer.startOffset;
+                        if (startDifference > 0) { // Starts after the buffer start
+                            KAIXO_DEBUG("Selection started after the start of the buffer, with margin {}", startDifference);
+                            selection.start = startDifference;
+                            selection.size = Math::max(selection.size, buffer.size() - startDifference);
+                            buffer.startOffset = 0;
+                        } else { // Starts before the buffer start
+                            KAIXO_DEBUG("Selection started before the start of the buffer, with margin {}", startDifference);
+                            selection.start = 0;
+                            selection.size = Math::max(selection.size + startDifference, 1);
+                            buffer.startOffset = 0;
+                        }
+                    });
+
+                    m_TimelineLength = buffer.size();
+                    m_CachedSelection = selection;
+                }
+            }
+
+            m_SavedFile.clear(); // No longer a saved file, because we're transforming it.
 
             m_CurrentTransform += t;
             KAIXO_DEBUG("New transform is '{}'.", m_CurrentTransform);
