@@ -32,6 +32,8 @@ namespace Kaixo::Processing {
         std::int64_t size{};
 
         std::size_t end() const { return start + size; }
+
+        bool operator==(const Selection& o) const { return o.start == start && o.size == size; }
     };
 
     // ------------------------------------------------
@@ -101,9 +103,18 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        /** Get the timeline length in samples, basically the longest buffer in the session.
+
+            @returns the timeline length in samples.
+         */
+        std::size_t timelineLength() const;
+
+        // ------------------------------------------------
+
     private:
         mutable std::mutex m_Mutex{};
         bool m_InSession = false;
+        Selection m_CachedSelection{};
 		Transform m_CurrentTransform{ Transform::Identity };
         FilePlayer m_Player;
         juce::AudioFormatManager m_FormatManager;
@@ -111,6 +122,7 @@ namespace Kaixo::Processing {
         Fft m_Fft{};
         std::atomic_size_t m_StateCounter = 0;
         cxxpool::thread_pool m_ActivityWorker{ 1 };
+        std::atomic_size_t m_TimelineLength = 0;
 
         // ------------------------------------------------
 

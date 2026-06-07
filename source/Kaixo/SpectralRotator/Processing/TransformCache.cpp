@@ -37,6 +37,17 @@ namespace Kaixo::Processing {
 		m_Cache.clear();
     }
 
+    void TransformCache::clearExceptIdentity() {
+        KAIXO_DEBUG("Clearing cache, except Identity.");
+        for (auto it = m_Cache.begin(); it != m_Cache.end(); ) {
+            if (it->first != Transform::Identity) {
+                it = m_Cache.erase(it);  // erase returns next iterator
+            } else {
+                ++it;
+            }
+        }
+    }
+
     // ------------------------------------------------
 
     void TransformCache::store(Transform t, const juce::AudioBuffer<float>& buffer) {

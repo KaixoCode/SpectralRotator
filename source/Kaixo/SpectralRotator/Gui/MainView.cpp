@@ -372,7 +372,7 @@ namespace Kaixo::Gui {
             g.setColour(stroke);
 
             // draw min/max envelope
-            if (samplesPerPixel > 4.f) {
+            if (samplesPerPixel > 1.f) {
                 for (int x = 0; x < width(); ++x) {
                     float s0 = Math::remap(x, 0.f, width(), startSample, endSample);
                     float s1 = Math::remap(x + 1, 0.f, width(), startSample, endSample);
@@ -389,7 +389,10 @@ namespace Kaixo::Gui {
                         maxV = Math::max(maxV, v);
                     }
 
-                    g.drawLine(static_cast<float>(x), sampleToY(minV), static_cast<float>(x), sampleToY(maxV), 1.f);
+                    float startY = sampleToY(minV);
+                    float endY = Math::min(sampleToY(maxV), startY - 1);
+
+                    g.drawLine(static_cast<float>(x) + 0.5f, startY, static_cast<float>(x) + 0.5f, endY, 1.f);
                 }
             } else { // draw antialiased path
                 juce::Path path;
@@ -520,11 +523,13 @@ namespace Kaixo::Gui {
         void zoomBounds(Point<float> bounds) {
             m_MaxZoom = bounds;
             constrainZoom();
+            zoomUpdated();
         }
 
         void zoom(Point<float> zoom) {
             m_Zoom = zoom;
             constrainZoom();
+            zoomUpdated();
             repaint();
         }
 
@@ -741,6 +746,238 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
+    class SelectionDisplay : public View, public BufferZoomListener {
+    public:
+
+        // ------------------------------------------------
+
+        Processing::InterfaceStorage<Processing::AudioBufferInterface> interface = context.interface<Processing::AudioBufferInterface>();
+
+        // ------------------------------------------------
+
+        // Config
+        std::size_t handleWidth = 20;
+        std::size_t minimumSelectionSize = 1;
+        bool clampToBuffer = true;
+
+        // ------------------------------------------------
+
+        // Graphics
+        Theme::Drawable start = theme()["start"];
+        Theme::Drawable end = theme()["end"];
+
+        // ------------------------------------------------
+
+        SelectionDisplay(Context c)
+            : View(c)
+        {
+            wantsIdle(true);
+        }
+
+        // ------------------------------------------------
+
+        void zoomChanged(Point<float> zoom) override {
+            m_Zoom = zoom;
+            repaint();
+        }
+
+        // ------------------------------------------------
+
+        void onIdle() override {
+            View::onIdle();
+
+            auto selection = interface->selection();
+
+            if (selection.start != m_Selection.start ||
+                selection.size != m_Selection.size)
+            {
+                m_Selection = selection;
+                repaint();
+            }
+        }
+
+        // ------------------------------------------------
+
+        void paint(juce::Graphics& g) override {
+            start.draw({
+                .graphics = g,
+                .view = this,
+                .context = context,
+                .bounds = startHandlePosition(),
+                .state = state(),
+            });
+
+            end.draw({
+                .graphics = g,
+                .view = this,
+                .context = context,
+                .bounds = endHandlePosition(),
+                .state = state(),
+            });
+        }
+
+        // ------------------------------------------------
+
+        void mouseDown(const juce::MouseEvent& e) override {
+            m_DragMode = DragMode::None; 
+            
+            if (startHandlePosition().contains(e.position)) {
+                m_DragMode = DragMode::Start;
+            } else if (endHandlePosition().contains(e.position)) {
+                m_DragMode = DragMode::End;
+            }
+
+            m_DragStart = m_Selection;
+            m_DesiredSize = m_Selection.size;
+        }
+
+        void mouseUp(const juce::MouseEvent&) override {
+            m_DragMode = DragMode::None;
+        }
+
+        void mouseDrag(const juce::MouseEvent& e) override {
+            if (m_DragMode == DragMode::None) {
+                return;
+            }
+
+            const auto size = bufferSize();
+            const auto sample = xToSample(e.position.x);
+
+            switch (m_DragMode) {
+            case DragMode::Start: {
+                std::size_t desiredEnd = sample + m_DesiredSize;
+
+                if (desiredEnd > size) {
+                    desiredEnd = size;
+                }
+
+                const std::size_t actualSize = (desiredEnd > sample) ? desiredEnd - sample : minimumSelectionSize;
+
+                m_Selection.start = Math::clamp(sample, std::size_t(0), size - 1);
+                m_Selection.size = std::max(actualSize, minimumSelectionSize);
+                break;
+            }
+            case DragMode::End: {
+                if (sample <= m_Selection.start) {
+                    m_Selection.size = minimumSelectionSize;
+                } else {
+                    m_Selection.size = Math::max(minimumSelectionSize, sample - m_Selection.start);
+                }
+
+                m_DesiredSize = m_Selection.size;
+                break;
+            }
+
+            default:
+                break;
+            }
+
+            update();
+        }
+
+        // ------------------------------------------------
+
+    private:
+        enum class DragMode {
+            None,
+            Start,
+            End
+        };
+
+        DragMode m_DragMode = DragMode::None;
+        Processing::Selection m_Selection;
+        Processing::Selection m_DragStart; 
+        std::size_t m_DesiredSize = 0;
+        Point<float> m_Zoom;
+
+        // ------------------------------------------------
+
+        std::size_t bufferSize() const { return interface->buffer().size(); }
+        std::size_t sampleRate() const { return interface->buffer().sampleRate(); }
+
+        // ------------------------------------------------
+
+        float zoomStartMs() const { return m_Zoom.x(); }
+        float zoomEndMs()   const { return m_Zoom.y(); }
+        float zoomSpanMs()  const { return m_Zoom.y() - m_Zoom.x(); }
+
+        // ------------------------------------------------
+
+        float sampleToX(std::size_t sample) const {
+            const float sr = sampleRate();
+            const float ms = Convert::samplesToMillis(sample, sr);
+
+            const auto span = zoomSpanMs();
+            if (span <= 0.0f) {
+                return 0.0f;
+            }
+
+            const auto norm = (ms - zoomStartMs()) / span;
+
+            return norm * width();
+        }
+
+        std::size_t xToSample(float x) const {
+            const auto w = width();
+
+            if (w <= 0.0f) {
+                return 0;
+            }
+
+            const auto norm = Math::clamp1(x / w);
+            const auto ms = zoomStartMs() + norm * zoomSpanMs();
+
+            return Convert::millisToSamples(ms, sampleRate());
+        }
+
+        // ------------------------------------------------
+
+        Rect<float> startHandlePosition() {
+            const auto x = sampleToX(m_Selection.start);
+
+            return {
+                x - handleWidth * 0.5f,
+                0.0f,
+                static_cast<float>(handleWidth),
+                static_cast<float>(height())
+            };
+        }
+
+        Rect<float> endHandlePosition() {
+            const auto x = sampleToX(m_Selection.start + m_Selection.size);
+
+            return {
+                x - handleWidth * 0.5f,
+                0.0f,
+                static_cast<float>(handleWidth),
+                static_cast<float>(height())
+            };
+        }
+
+        // ------------------------------------------------
+
+        void update() {
+            constrain();
+            KAIXO_DEBUG("Updated selection [{}, {}].", m_Selection.start, m_Selection.size);
+            interface->selection() = m_Selection;
+            repaint();
+        }
+
+        void constrain() {
+            if (bufferSize() == 0) {
+                return;
+            }
+
+            m_Selection.start = Math::clamp(m_Selection.start, 0, bufferSize() - 1);
+            m_Selection.size = Math::clamp(m_Selection.size, minimumSelectionSize, bufferSize() - m_Selection.start);
+        }
+
+        // ------------------------------------------------
+
+    };
+
+    // ------------------------------------------------
+
     class FileDisplay : public View, public juce::FileDragAndDropTarget, public SettingsListener, public BufferZoomListener {
     public:
 
@@ -773,14 +1010,16 @@ namespace Kaixo::Gui {
 
             // ------------------------------------------------
 
-            add<SpectralDisplay>("spectral-display", { 0, 20, Width, Height - 240 });
-            add<WaveformDisplay>("waveform-display", { 0, Height - 220, Width, 200 });
+            add<SpectralDisplay>("spectral-display", { 0, 20, Width, Height - 160 });
+            add<WaveformDisplay>("waveform-display", { 0, Height - 140, Width, 100 });
 
-            add<LargeScrollbar>("scrollbar", { 0, Height - 20, Width, 20 }, { 
+            add<LargeScrollbar>("scrollbar", { 0, Height - 40, Width, 40 }, { 
                 .onupdate = [this](Point<float> zoom) {
                     context.window().notifyListeners(&BufferZoomListener::zoomChanged, zoom);
                 }
             });
+
+            add<SelectionDisplay>("selection", { 0, 20, Width, Height - 60 });
 
             // ------------------------------------------------
 
@@ -794,6 +1033,13 @@ namespace Kaixo::Gui {
 
         void onIdle() override {
             View::onIdle();
+
+            // State changed, sync
+            if (m_StateCounter != interface->stateCounter()) {
+                m_StateCounter = interface->stateCounter();
+
+                updateZoomBounds();
+            }
 
             if (m_TransformFuture.valid() && m_TransformFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
                 KAIXO_DEBUG("Transform finished, notifying spectral display to refresh image.");
@@ -809,12 +1055,7 @@ namespace Kaixo::Gui {
                 handleFileLoadResult(result);
                 m_LoadFuture = {};
 
-                // Resets zoom on load, to show the whole file.
-                Point<float> bounds{ 0.f, 1000.f * interface->buffer().size() / interface->buffer().sampleRate() };
-                if (auto scrollbar = find<LargeScrollbar>("scrollbar")) {
-                    scrollbar->get().zoomBounds(bounds);
-                    scrollbar->get().zoom(bounds);
-                }
+                updateZoomBounds(true);
 
                 context.window().notifyListeners(&AudioBufferChangeListener::bufferChanged);
                 scheduleAnalyze();
@@ -857,6 +1098,37 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
+        void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& d) override {
+            const float start = m_ZoomMillis.x();
+            const float end   = m_ZoomMillis.y();
+            const float range = end - start;
+
+            if (range <= 0.0f) {
+                return;
+            }
+
+            float zoomSpeed = 0.5f;
+            if (event.mods.isCtrlDown()) zoomSpeed *= 0.5f;
+            if (event.mods.isShiftDown()) zoomSpeed *= 0.5f;
+            
+            const float mouseNorm = Math::clamp1(event.position.x / width());
+            const float anchorTime = start + mouseNorm * range;
+            const float zoomFactor = Math::exp(-d.deltaY * zoomSpeed);
+            float newRange = Math::max(1.f, range * zoomFactor);
+
+            const float anchorRatio = (anchorTime - start) / range;
+            float newStart = anchorTime - anchorRatio * newRange;
+            float newEnd   = newStart + newRange;
+
+            m_ZoomMillis = { newStart, newEnd };
+
+            if (auto scrollbar = find<LargeScrollbar>("scrollbar")) {
+                scrollbar->get().zoom(m_ZoomMillis);
+            }
+        }
+
+        // ------------------------------------------------
+
     private:
         std::future<void> m_TransformFuture{};
         std::future<Processing::AnalyzeResult> m_AnalyzeFuture{};
@@ -864,11 +1136,22 @@ namespace Kaixo::Gui {
         Point<float> m_ZoomMillis{}; // Range of the audio file that it's zoomed in on.
         std::atomic_bool m_AnalyzeDirty = false;
         Processing::AnalyzeSettings m_AnalyzeSettings{};
+        std::size_t m_StateCounter = 0;
 
         // ------------------------------------------------
 
         void scheduleAnalyze() {
             m_AnalyzeDirty = true;
+        }
+
+        // ------------------------------------------------
+
+        void updateZoomBounds(bool setZoom = false) {
+            Point<float> bounds{ 0.f, Convert::samplesToMillis(interface->timelineLength(), interface->buffer().sampleRate()) };
+            if (auto scrollbar = find<LargeScrollbar>("scrollbar")) {
+                scrollbar->get().zoomBounds(bounds);
+                if (setZoom) scrollbar->get().zoom(bounds);
+            }
         }
 
         // ------------------------------------------------

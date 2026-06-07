@@ -28,6 +28,12 @@ namespace Kaixo::Processing {
          */
         const SafeAudioBuffer& buffer();
 
+        /** Get the timeline length in samples, basically the longest buffer in the session.
+            
+            @returns the timeline length in samples.
+         */
+        std::size_t timelineLength();
+
         // ------------------------------------------------
 
         /** Get the selection in the audio buffer.
@@ -35,6 +41,14 @@ namespace Kaixo::Processing {
             @returns the selection in the audio buffer.
          */
         Processing::Selection& selection();
+
+        // ------------------------------------------------
+
+        /** Get the state counter, can be used to determine whether state has changed.
+            
+            @returns the state counter.
+         */
+        std::size_t stateCounter();
 
         // ------------------------------------------------
 

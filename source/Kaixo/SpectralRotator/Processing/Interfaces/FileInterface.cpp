@@ -17,12 +17,24 @@ namespace Kaixo::Processing {
         auto& processor = self<SpectralRotatorProcessor>();
         return processor.file.buffer;
     }
-    
+
+    std::size_t AudioBufferInterface::timelineLength() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.timelineLength();
+    }
+
     // ------------------------------------------------
 
     Processing::Selection& AudioBufferInterface::selection() {
         auto& processor = self<SpectralRotatorProcessor>();
         return processor.file.selection;
+    }
+    
+    // ------------------------------------------------
+
+    std::size_t AudioBufferInterface::stateCounter() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.stateCounter();
     }
     
     // ------------------------------------------------

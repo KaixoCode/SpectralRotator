@@ -51,10 +51,15 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        // Used to offset the buffer while reading.
+        std::atomic_int64_t startOffset = 0;
+
+        // ------------------------------------------------
+
     private:
-        juce::AudioBuffer<float> m_Buffer;
+        juce::AudioBuffer<float> m_Buffer{};
         float m_SampleRate = 44100.0f;
-        ReadWriteLock m_Lock;
+        ReadWriteLock m_Lock{};
     };
 
     // ------------------------------------------------

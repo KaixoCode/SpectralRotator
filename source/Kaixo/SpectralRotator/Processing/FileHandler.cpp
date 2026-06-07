@@ -48,6 +48,7 @@ namespace Kaixo::Processing {
         m_Cache.invalidate();
 
         buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
+            buffer.startOffset = 0;
             bfr.setSize(0, 0);
             sampleRate = 0;
         });
@@ -87,7 +88,9 @@ namespace Kaixo::Processing {
                 // Assume new imported file was from previous export, 
                 // so start of the file is the start of our selection.
                 selection.start = 0;
-                
+                buffer.startOffset = 0;
+                m_TimelineLength = newBuffer.getNumSamples();
+
                 sampleRate = static_cast<float>(reader->sampleRate);
                 bfr = std::move(newBuffer);
                 
@@ -114,10 +117,49 @@ namespace Kaixo::Processing {
     std::future<void> FileHandler::transform(TransformInstruction t) {
         KAIXO_DEBUG("Added transform '{}' to activity queue.", t);
 
-        return m_ActivityWorker.push([this, t, select = selection] {
-            KAIXO_DEBUG("Doing transform '{}'.", t);
+        if (!m_Cache.contains(Transform::Identity)) {
+            KAIXO_ERROR("Trying to do a transform '{}', but the cache doesn't contain the identity transform.", t);
+            return {};
+        }
 
+        if (m_CachedSelection != selection) { // New selection
+            KAIXO_DEBUG("New selection [{}, {}].", selection.start, selection.size);
+
+            if (m_CurrentTransform == Transform::Identity) {
+                KAIXO_DEBUG("Identity transform, so just clear other cached transforms.");
+                m_CachedSelection = selection;
+                m_Cache.clearExceptIdentity();
+            } else {
+                KAIXO_DEBUG("Non-identity transform, start a new session, with current buffer as Identity.");
+                m_Cache.invalidate();
+
+                buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
+                    m_Cache.store(Transform::Identity, bfr);
+                    m_CurrentTransform = Transform::Identity;
+
+                    float startDifference = selection.start - buffer.startOffset;
+                    if (startDifference > 0) { // Starts after the buffer start
+                        KAIXO_DEBUG("Selection started after the start of the buffer, with margin {}", startDifference);
+                        selection.start = startDifference;
+                        selection.size = Math::max(selection.size, buffer.size() - startDifference);
+                        buffer.startOffset = 0;
+                    } else { // Starts before the buffer start
+                        KAIXO_DEBUG("Selection started before the start of the buffer, with margin {}", startDifference);
+                        selection.start = 0;
+                        selection.size = Math::max(selection.size + startDifference, 1);
+                        buffer.startOffset = 0;
+                    }
+                });
+
+                m_TimelineLength = buffer.size();
+                m_CachedSelection = selection;
+            }
+        }
+
+        return m_ActivityWorker.push([this, t, select = selection] {
             std::lock_guard lock{ m_Mutex };
+
+            KAIXO_DEBUG("Doing transform '{}' with selection [{}, {}].", t, select.start, select.size);
 
             if (!m_InSession) {
                 KAIXO_WARNING("Trying to do a transform '{}' while not in a session.", t);
@@ -132,20 +174,10 @@ namespace Kaixo::Processing {
             m_CurrentTransform += t;
             KAIXO_DEBUG("New transform is '{}'.", m_CurrentTransform);
 
-            if (m_Cache.contains(m_CurrentTransform)) {
-                KAIXO_DEBUG("Found goal transform '{}' in cache.", m_CurrentTransform);
-
-                buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) {
-                    bfr = m_Cache.get(m_CurrentTransform);
-                });
-
-                return;
-            }
-
             TransformOperation ops{};
             bool startFromFft = false;
             switch (m_CurrentTransform) {
-            case Transform::Identity:  return; // Shouldn't occur, identity is always in the cache.
+            case Transform::Identity:  break;
             case Transform::Rotate90:  startFromFft = true; ops = TransformOperation::Flip; break;
             case Transform::Rotate180: ops = TransformOperation::Flip | TransformOperation::Reverse; break;
             case Transform::Rotate270: startFromFft = true; ops = TransformOperation::Reverse; break;
@@ -163,10 +195,18 @@ namespace Kaixo::Processing {
                     performFft(select, m_Cache.get(Transform::Identity));
                 }
 
-                performTransform(Transform::Mirror90, ops, select, m_Cache.get(Transform::Mirror90));
+                performTransform(Transform::Mirror90, ops, { 0, select.size }, m_Cache.get(Transform::Mirror90));
             } else {
                 performTransform(Transform::Identity, ops, select, m_Cache.get(Transform::Identity));
             }
+
+            if (m_CurrentTransform == Transform::Identity) {
+                buffer.startOffset = 0;
+            } else {
+                buffer.startOffset = select.start;
+            }
+
+            notifyStateChanged();
         });
     }
 
@@ -259,6 +299,10 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
+    std::size_t FileHandler::timelineLength() const { return m_TimelineLength; }
+
+    // ------------------------------------------------
+
     void FileHandler::performTransform(Transform start, TransformOperation ops, Selection select, const juce::AudioBuffer<float>& from) {
 
         // ------------------------------------------------
@@ -289,7 +333,7 @@ namespace Kaixo::Processing {
 		for (int channel = 0; channel < result.getNumChannels(); ++channel) {
             for (int i = 0; i < result.getNumSamples(); ++i) {
                 const int relativeIndex = select.start + i;
-                const int index = static_cast<int>(doReverse ? select.end() - 1 - relativeIndex : relativeIndex);
+                const int index = static_cast<int>(doReverse ? select.end() - 1 - i : relativeIndex);
 
                 float sample = 0.f;
                 if (index >= 0 && index < from.getNumSamples()) {
@@ -303,11 +347,10 @@ namespace Kaixo::Processing {
                 }
             }
         }
-
+        
         // ------------------------------------------------
 
         buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) { bfr = result; });
-        notifyStateChanged();
 
         // ------------------------------------------------
 
@@ -330,16 +373,18 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        std::vector<float> sumInputs(from.getNumChannels());
         for (int channel = 0; channel < from.getNumChannels(); ++channel) {
             for (int i = 0; i < select.size; ++i) {
                 const int index = select.start + i;
 
                 float sample = 0.f;
                 if (index >= 0 && index < from.getNumSamples()) {
-                    sample = from.getSample(channel, i);
+                    sample = from.getSample(channel, index);
                 }
 
                 complexBuffer[channel][i] = sample;
+                sumInputs[channel] += sample * sample;
             }
         }
 
@@ -352,8 +397,16 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         for (int channel = 0; channel < result.getNumChannels(); ++channel) {
+            float sumOutput = 0;
             for (int i = 0; i < result.getNumSamples(); ++i) {
-                result.setSample(channel, i, complexBuffer[channel][i].real());
+                float sample = complexBuffer[channel][i].real();
+                result.setSample(channel, i, sample);
+                sumOutput += sample * sample;
+            }
+
+            float energyRatio = Math::Fast::sqrt(sumInputs[channel] / sumOutput);
+            for (int i = 0; i < result.getNumSamples(); ++i) {
+                result.setSample(channel, i, result.getSample(channel, i) * energyRatio);
             }
         }
 

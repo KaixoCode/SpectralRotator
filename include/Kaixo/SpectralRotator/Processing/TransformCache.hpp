@@ -129,6 +129,9 @@ namespace Kaixo::Processing {
 		// Clears the cache, removing all stored transforms.
         void invalidate();
 
+		// Clears the cache, removing all stored transforms, except Identity.
+        void clearExceptIdentity();
+
         // ------------------------------------------------
 
         /** Store a transformed buffer in the cache.

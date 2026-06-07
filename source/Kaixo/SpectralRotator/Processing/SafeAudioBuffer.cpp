@@ -18,8 +18,8 @@ namespace Kaixo::Processing {
 
 	std::size_t SafeAudioBuffer::size() const {
         auto locked = m_Lock.read();
-        if (!locked) return 0;
-        return m_Buffer.getNumSamples(); 
+        if (!locked) return startOffset;
+        return m_Buffer.getNumSamples() + startOffset;
     }
 
 	float SafeAudioBuffer::sampleRate() const {
@@ -32,6 +32,8 @@ namespace Kaixo::Processing {
 
     Processing::Stereo SafeAudioBuffer::read(std::int64_t index) const {
         auto locked = m_Lock.read();
+
+        index -= startOffset;
 
         if (!locked || index < 0 || index >= m_Buffer.getNumSamples()) {
             return { 0, 0 };

@@ -65,6 +65,32 @@ file: {
     stroke: [255]
   }
 
+  selection: {
+    start: {
+      layers: {
+        line: {
+          rect: {
+            dimensions: [0, 0, 1, "$height"]
+            align: top-center
+            fill: [255]
+          }
+        }
+      }
+    }
+    
+    end: {
+      layers: {
+        line: {
+          rect: {
+            dimensions: [0, 0, 1, "$height"]
+            align: top-center
+            fill: [255]
+          }
+        }
+      }
+    }
+  }
+
   scrollbar: {
     handle: {
       background-color: [255, 255, 255, 40]
