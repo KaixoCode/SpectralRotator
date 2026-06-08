@@ -73,16 +73,20 @@ namespace Kaixo::Processing {
         // Trigonometric table
         vector<complex<float> > expTable(n / 2);
         for (size_t i = 0; i < n / 2; i++) {
-            step();
             expTable[i] = std::polar(1.0f, (inverse ? 2 : -2) * (std::numbers::pi_v<float>) * i / n);
+
+            step();
+            if (shouldStop()) return;
         }
 
         // Bit-reversed addressing permutation
         for (size_t i = 0; i < n; i++) {
-            step();
             size_t j = reverseBits(i, levels);
             if (j > i)
                 std::swap(vec[i], vec[j]);
+
+            step();
+            if (shouldStop()) return;
         }
 
         // Cooley-Tukey decimation-in-time radix-2 FFT
@@ -94,7 +98,9 @@ namespace Kaixo::Processing {
                     complex<float> temp = vec[j + halfsize] * expTable[k];
                     vec[j + halfsize] = vec[j] - temp;
                     vec[j] += temp;
+
                     step();
+                    if (shouldStop()) return;
                 }
             }
             if (size == n)  // Prevent overflow in 'size *= 2'
@@ -116,20 +122,26 @@ namespace Kaixo::Processing {
             temp %= static_cast<uintmax_t>(n) * 2;
             float angle = (inverse ? (std::numbers::pi_v<float>) : -(std::numbers::pi_v<float>)) * temp / n;
             expTable[i] = std::polar(1.0f, angle);
+
             step();
+            if (shouldStop()) return;
         }
 
         // Temporary vectors and preprocessing
         vector<complex<float> > avec(m);
         for (size_t i = 0; i < n; i++) {
             avec[i] = vec[i] * expTable[i];
+
             step();
+            if (shouldStop()) return;
         }
         vector<complex<float> > bvec(m);
         bvec[0] = expTable[0];
         for (size_t i = 1; i < n; i++) {
-            step();
             bvec[i] = bvec[m - i] = std::conj(expTable[i]);
+
+            step();
+            if (shouldStop()) return;
         }
 
         // Convolution
@@ -137,8 +149,10 @@ namespace Kaixo::Processing {
 
         // Postprocessing
         for (size_t i = 0; i < n; i++) {
-            step();
             vec[i] = cvec[i] * expTable[i];
+
+            step();
+            if (shouldStop()) return;
         }
     }
 
@@ -204,6 +218,11 @@ namespace Kaixo::Processing {
     std::size_t Fft::estimateSteps(std::size_t size, bool inverse) {
         return estimateFft(size, inverse);
     }
+
+    // ------------------------------------------------
+
+    void Fft::step() { if (progress) progress->step(); }
+    bool Fft::shouldStop() { return cancelation ? cancelation->load() : false; }
 
     // ------------------------------------------------
 

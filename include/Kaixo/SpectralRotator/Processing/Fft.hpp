@@ -32,6 +32,10 @@
 
 // ------------------------------------------------
 
+#include "Kaixo/SpectralRotator/Processing/ProgressCounter.hpp"
+
+// ------------------------------------------------
+
 namespace Kaixo::Processing {
 
     // ------------------------------------------------
@@ -40,7 +44,8 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        std::size_t* stepRef = nullptr; // For progress bar
+        ProgressCounter* progress = nullptr;
+        std::atomic_bool* cancelation = nullptr;
 
         // ------------------------------------------------
 
@@ -60,7 +65,8 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
-        void step() { if (stepRef) (*stepRef)++; }
+        void step();
+        bool shouldStop();
 
         // ------------------------------------------------
 

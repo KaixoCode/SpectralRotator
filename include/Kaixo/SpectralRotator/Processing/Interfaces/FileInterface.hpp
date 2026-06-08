@@ -109,6 +109,9 @@ namespace Kaixo::Processing {
          */
         float analyzeProgress();
 
+        // Request cancelation of any active analyze activity.
+        void cancelAnalyze();
+
         // ------------------------------------------------
 
         /** Queue the audio buffer to save to file.
@@ -116,6 +119,12 @@ namespace Kaixo::Processing {
             @returns the file path it saved to, or empty if failed.
          */
         std::future<std::filesystem::path> save();
+
+        /** Used to signal progress of the save activity.
+
+            @returns the progress of the save activity.
+         */
+        float saveProgress();
 
         // ------------------------------------------------
 

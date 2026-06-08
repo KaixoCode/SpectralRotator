@@ -21,10 +21,16 @@ variables: {
     image-clip: [0, 0, 772, 772]
     image-position: [0, 0, 20, 20]
     image-align: center
+    image-color: {
+      transition: $transition
+      value: [211]
+      disabled: [128]
+    }
     background-color: {
       transition: $transition
       value: [255, 0]
       hovering: [255, 20]
+      disabled: [255, 0]
     }
   }
 }
@@ -81,8 +87,9 @@ file: {
       dimensions: [0, 0, "$width", 30]
       fill: {
         start: [0, 0]
-        end: ["$width", "$height"]
+        end: [500, 500]
         radial: false
+        global: true
         colors: [
           { hsl: ["$hue", "$sat", 20] }
           { hsl: ["$hue", "$sat", 23] }
@@ -139,21 +146,77 @@ file: {
     }]
   }
 
-  selection-start: {
+  progress-bar: {
+    text: $activity: $progress-percent%
     font: $main-font
-    text: $value
-    text-color: [255]
-    text-position: [4, 0]
-    text-align: center-left
+    text-align: center-right
+    text-position: [0, 0]
+    text-color: {
+      transition: $transition
+      value: [255]
+      disabled: [255, 0]
+    }
+    rect: {
+      dimensions: {
+        x: 0
+        y: 0
+        width: $width * $progress
+        height: 2
+      }
+
+      fill: {
+        transition: $transition
+        value: { hsl: ["$hue", "$sat * 5", 80] }
+        disabled:  { hsl: ["$hue", "$sat * 5", 50], a: 0 }
+      }
+    }
   }
 
-  selection-size: {
+  $popup: {
+    font: $main-font
+    text-color: [255]
+    text-align: center-left
+    caret-color: [255]
+    selection-color: [200, 200, 255, 100]
+    background: {
+      background-color: {
+        start: [0, 0]
+        end: [500, 500]
+        radial: false
+        global: true
+        colors: [
+          { hsl: ["$hue", "$sat", 20] }
+          { hsl: ["$hue", "$sat", 23] }
+          { hsl: ["$hue", "$sat", 20] }
+          { hsl: ["$hue", "$sat", 17] }
+          { hsl: ["$hue", "$sat", 21] }
+        ]
+      }
+      
+      rect: {
+        dimensions: [4, 4, "$width - 8", "$height - 8"]
+        fill: [0, 50]
+      }
+    }
+  }
+
+  $select-knob: {
+    popup: $popup
+
     font: $main-font
     text: $value
     text-color: [255]
-    text-position: [4, 0]
+    text-position: [8, 0]
     text-align: center-left
+
+    rect: {
+      dimensions: [4, 4, "$width - 8", "$height - 8"]
+      fill: [0, 50]
+    }
   }
+
+  selection-start: $select-knob
+  selection-size: $select-knob
 
   file-drag: {
     $icon: drag-icon.png
@@ -269,7 +332,7 @@ settings: {
         radial: false
         colors: [
           { hsl: ["$hue", "$sat", 20] }
-          { hsl: ["$hue", "$sat", 23] }
+          { hsl: ["$hue", "$sat", 20] }
           { hsl: ["$hue", "$sat", 20] }
           { hsl: ["$hue", "$sat", 19] }
           { hsl: ["$hue", "$sat", 21] }

@@ -72,7 +72,8 @@ namespace Kaixo::Processing {
     }
 
     float AudioBufferInterface::transformProgress() {
-        return 1;
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.transformProgress();
     }
 
     std::future<FileLoadResult> AudioBufferInterface::load(std::filesystem::path path) {
@@ -81,7 +82,8 @@ namespace Kaixo::Processing {
     }
 
     float AudioBufferInterface::loadProgress() {
-        return 1;
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.loadProgress();
     }
 
     std::future<AnalyzeResult> AudioBufferInterface::analyze(AnalyzeSettings settings) {
@@ -90,7 +92,13 @@ namespace Kaixo::Processing {
     }
 
     float AudioBufferInterface::analyzeProgress() {
-        return 1;
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.analyzeProgress();
+    }
+
+    void AudioBufferInterface::cancelAnalyze() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        processor.file.requestCancelAnalyze();
     }
 
     // ------------------------------------------------
@@ -98,6 +106,11 @@ namespace Kaixo::Processing {
     std::future<std::filesystem::path> AudioBufferInterface::save() {
         auto& processor = self<SpectralRotatorProcessor>();
         return processor.file.save();
+    }
+
+    float AudioBufferInterface::saveProgress() {
+        auto& processor = self<SpectralRotatorProcessor>();
+        return processor.file.saveProgress();
     }
 
     // ------------------------------------------------

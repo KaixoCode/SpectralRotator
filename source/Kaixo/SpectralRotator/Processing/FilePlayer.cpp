@@ -19,8 +19,8 @@ namespace Kaixo::Processing {
             return;
         }
 
-		m_Resampler.samplerate.in = m_File.sampleRate();
-		m_Resampler.samplerate.out = sampleRate();
+		m_Resampler.sampleRate.in = m_File.sampleRate();
+		m_Resampler.sampleRate.out = sampleRate();
 
         output = m_Resampler.generate([&] { 
             m_PlaybackPosition.fetch_add(1, std::memory_order_relaxed);

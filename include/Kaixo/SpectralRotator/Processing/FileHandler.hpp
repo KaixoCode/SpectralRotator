@@ -12,6 +12,7 @@
 #include "Kaixo/SpectralRotator/Processing/FilePlayer.hpp"
 #include "Kaixo/SpectralRotator/Processing/SafeAudioBuffer.hpp"
 #include "Kaixo/SpectralRotator/Processing/TransformCache.hpp"
+#include "Kaixo/SpectralRotator/Processing/AnalyzeResult.hpp"
 
 // ------------------------------------------------
 
@@ -100,6 +101,9 @@ namespace Kaixo::Processing {
          */
         std::future<AnalyzeResult> analyze(AnalyzeSettings settings);
 
+        // Request that the analyze stops, to make room for a new one.
+        void requestCancelAnalyze();
+
         // ------------------------------------------------
 
         /** Returns the current state counter of the file handler, which can be 
@@ -119,6 +123,20 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+        // @returns the analyze progress.
+        float analyzeProgress() const;
+
+        // @returns the transform progress.
+        float transformProgress() const;
+
+        // @returns the load progress.
+        float loadProgress() const;
+
+        // @returns the load progress.
+        float saveProgress() const;
+
+        // ------------------------------------------------
+
     private:
         mutable std::mutex m_Mutex{};
         bool m_InSession = false;
@@ -126,7 +144,6 @@ namespace Kaixo::Processing {
 		Transform m_CurrentTransform{ Transform::Identity };
         juce::AudioFormatManager m_FormatManager;
         TransformCache m_Cache{};
-        Fft m_Fft{};
         std::atomic_size_t m_StateCounter = 0;
         cxxpool::thread_pool m_ActivityWorker{ 1 };
         std::atomic_size_t m_TimelineLength = 0;
@@ -134,6 +151,15 @@ namespace Kaixo::Processing {
         std::filesystem::path m_LoadedFile{};
         std::filesystem::path m_SavedFile{};
         std::string m_OriginalFileName{};
+        std::atomic_bool m_AnalyzerCanceled = false;
+        std::atomic_bool m_TransformCanceled = false;
+
+        // ------------------------------------------------
+
+        ProgressCounter m_LoadProgress{};
+        ProgressCounter m_SaveProgress{};
+        ProgressCounter m_AnalyzeProgress{};
+        ProgressCounter m_TransformProgress{};
 
         // ------------------------------------------------
 

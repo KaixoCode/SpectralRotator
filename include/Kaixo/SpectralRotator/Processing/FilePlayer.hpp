@@ -3,10 +3,10 @@
 // ------------------------------------------------
 
 #include "Kaixo/Core/Processing/Module.hpp"
-#include "Kaixo/Core/Processing/Resampler.hpp"
 
 // ------------------------------------------------
 
+#include "Kaixo/SpectralRotator/Processing/AudioResampler.hpp"
 #include "Kaixo/SpectralRotator/Processing/SafeAudioBuffer.hpp"
 
 // ------------------------------------------------
@@ -48,7 +48,7 @@ namespace Kaixo::Processing {
         SafeAudioBuffer& m_File;
         std::atomic_bool m_Playing{ false };
         std::atomic_int64_t m_PlaybackPosition{ 0 };
-        Resampler m_Resampler{};
+        AudioResampler m_Resampler{};
     };
 
     // ------------------------------------------------

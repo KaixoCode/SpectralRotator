@@ -29,7 +29,10 @@ namespace Kaixo::Processing {
         m_FormatManager.registerBasicFormats();
     }
 
-    FileHandler::~FileHandler() {}
+    FileHandler::~FileHandler() {
+        m_AnalyzerCanceled = true;
+        m_TransformCanceled = true;
+    }
 
     // ------------------------------------------------
 
@@ -48,8 +51,8 @@ namespace Kaixo::Processing {
         m_InSession = false;
         m_Cache.invalidate();
 
-        buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
-            buffer.startOffset = 0;
+        buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate, std::int64_t& start) {
+            start = 0;
             bfr.setSize(0, 0);
             sampleRate = 0;
         });
@@ -59,6 +62,10 @@ namespace Kaixo::Processing {
 
     std::future<FileLoadResult> FileHandler::load(std::filesystem::path path) {
         KAIXO_DEBUG("Added load '{}' to activity queue.", Convert::pathToString(path));
+
+        // Cancel all other activities on a load.
+        m_TransformCanceled = true;
+        m_AnalyzerCanceled = true;
 
         return m_ActivityWorker.push([this, path] {
             std::lock_guard lock{ m_Mutex };
@@ -80,7 +87,7 @@ namespace Kaixo::Processing {
                 return FileLoadResult::FailedToRead;
             }
 
-            buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
+            buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate, std::int64_t& start) {
                 // Sample rate changed mid-session, adjust the selection accordingly
 				if (m_InSession && sampleRate != static_cast<float>(reader->sampleRate)) {
                     selection.size = static_cast<std::int64_t>(reader->lengthInSamples * reader->sampleRate / sampleRate);
@@ -89,10 +96,10 @@ namespace Kaixo::Processing {
                 // Assume new imported file was from previous export, 
                 // so start of the file is the start of our selection.
                 selection.start = 0;
-                buffer.startOffset = 0;
                 m_IdentityBufferOffset = 0;
                 m_TimelineLength = newBuffer.getNumSamples();
 
+                start = 0;
                 sampleRate = static_cast<float>(reader->sampleRate);
                 bfr = std::move(newBuffer);
                 
@@ -176,13 +183,13 @@ namespace Kaixo::Processing {
 
             juce::AudioBuffer<float> audio{};
             auto sampleRate = buffer.sampleRate();
-            buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) {
+            buffer.access([&](juce::AudioBuffer<float>& bfr, float&, std::int64_t&) {
                 audio = bfr;
             });
 
             juce::WavAudioFormat wavFormat{};
             std::unique_ptr<juce::AudioFormatWriter> writer{
-                wavFormat.createWriterFor(fileStream, sampleRate, (unsigned int)audio.getNumChannels(), 16, {}, 0) 
+                wavFormat.createWriterFor(fileStream, sampleRate, (unsigned int)audio.getNumChannels(), 32, {}, 0) 
             };
 
             if (writer == nullptr) {
@@ -209,8 +216,13 @@ namespace Kaixo::Processing {
     std::future<void> FileHandler::transform(TransformInstruction t) {
         KAIXO_DEBUG("Added transform '{}' to activity queue.", t);
 
+        m_TransformCanceled = false;
+        m_AnalyzerCanceled = true; // Stop any analyzing
+
         return m_ActivityWorker.push([this, t, select = selection] mutable {
             std::lock_guard lock{ m_Mutex };
+
+            auto _ = m_TransformProgress.scoped();
 
             KAIXO_DEBUG("Doing transform '{}' with selection [{}, {}].", t, select.start, select.size);
 
@@ -238,7 +250,7 @@ namespace Kaixo::Processing {
                     m_LoadedFile.clear(); // No longer from a loaded file.
                     
                     m_IdentityBufferOffset = buffer.startOffset.load();
-                    buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate) {
+                    buffer.access([&](juce::AudioBuffer<float>& bfr, float&, std::int64_t&) {
                         m_Cache.store(Transform::Identity, bfr);
                     });
                 }
@@ -290,6 +302,8 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
     
     std::future<AnalyzeResult> FileHandler::analyze(AnalyzeSettings settings) {
+        m_AnalyzerCanceled = false;
+
         return m_ActivityWorker.push([this, settings] {
 
             // ------------------------------------------------
@@ -298,11 +312,15 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
+            auto _ = m_AnalyzeProgress.scoped();
+
+            // ------------------------------------------------
+
             const float sampleRate = buffer.sampleRate();
             const std::int64_t size = buffer.size();
             const std::int64_t blockSize = static_cast<std::int64_t>(settings.fftSize);
-            const std::int64_t distanceBetweenBlocks = static_cast<std::int64_t>(Math::max(+Convert::millisToSamples(settings.fftResolution, sampleRate), 1));
-            const std::int64_t blocks = size / distanceBetweenBlocks;
+            const float distanceBetweenBlocks = Math::max(+Convert::millisToSamples(settings.fftResolution, sampleRate), 1);
+            const std::int64_t blocks = Math::ceil(size / distanceBetweenBlocks);
             const std::int64_t frequencyBins = settings.fftSize / 2 + 1;
 
             // ------------------------------------------------
@@ -317,14 +335,26 @@ namespace Kaixo::Processing {
 
             // ------------------------------------------------
 
-            Fft fft;
+            Fft fft{};
+            fft.progress = &m_AnalyzeProgress;
+            fft.cancelation = &m_AnalyzerCanceled;
+
+            // ------------------------------------------------
+
+            std::int64_t fftEstimate = blocks * fft.estimateSteps(settings.fftSize, false);
+            std::int64_t initializeEstimate = blocks * blockSize;
+            std::int64_t decibelsEstimate = blocks * frequencyBins;
+
+            m_AnalyzeProgress.increaseEstimate(fftEstimate);
+            m_AnalyzeProgress.increaseEstimate(initializeEstimate);
+            m_AnalyzeProgress.increaseEstimate(decibelsEstimate);
 
             // ------------------------------------------------
 
             for (std::int64_t block = 0; block < blocks; ++block) {
                 result.blocks[block].result.resize(frequencyBins);
 
-                std::int64_t sampleStartOfBlock = block * distanceBetweenBlocks;
+                std::int64_t sampleStartOfBlock = static_cast<std::int64_t>(block * distanceBetweenBlocks);
 
                 // ------------------------------------------------
 
@@ -337,11 +367,15 @@ namespace Kaixo::Processing {
                     windowScaleAdjustment += sinWindow;
 
                     fftBuffer[sampleInBlock] = buffer.read(sample).average() * sinWindow;
+
+                    m_AnalyzeProgress.step(); // Initialize step
+                    if (m_AnalyzerCanceled) return result;
                 }
 
                 // ------------------------------------------------
 
                 fft.transform(fftBuffer, false);
+                if (m_AnalyzerCanceled) return result;
 
                 // ------------------------------------------------
 
@@ -352,6 +386,9 @@ namespace Kaixo::Processing {
                     if (result.blocks[block].result[bin] < -145) {
                         result.blocks[block].result[bin] = -145;
                     }
+
+                    m_AnalyzeProgress.step(); // Decibels step
+                    if (m_AnalyzerCanceled) return result;
                 }
 
                 // ------------------------------------------------
@@ -370,6 +407,10 @@ namespace Kaixo::Processing {
 
     }
 
+    void FileHandler::requestCancelAnalyze() {
+        m_AnalyzerCanceled = true;
+    }
+
     // ------------------------------------------------
 
     std::size_t FileHandler::stateCounter() const { return m_StateCounter.load(std::memory_order_relaxed); }
@@ -377,6 +418,13 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     std::size_t FileHandler::timelineLength() const { return m_TimelineLength; }
+
+    // ------------------------------------------------
+
+    float FileHandler::analyzeProgress() const { return m_AnalyzeProgress.progress(); }
+    float FileHandler::transformProgress() const { return m_TransformProgress.progress(); }
+    float FileHandler::loadProgress() const { return m_LoadProgress.progress(); }
+    float FileHandler::saveProgress() const { return m_SaveProgress.progress(); }
 
     // ------------------------------------------------
 
@@ -396,7 +444,7 @@ namespace Kaixo::Processing {
         if (!doFlip && !doReverse) {
             KAIXO_DEBUG("PerformTransform was called without operations, copying buffer directly.");
 
-            buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) { bfr = from; });
+            buffer.access([&](juce::AudioBuffer<float>& bfr, float&, std::int64_t&) { bfr = from; });
             notifyStateChanged();
             return;
         }
@@ -404,12 +452,13 @@ namespace Kaixo::Processing {
         // ------------------------------------------------
 
         KAIXO_DEBUG("Performing transform '{}' with starting transform '{}'", ops, start);
+        m_TransformProgress.increaseEstimate(result.getNumChannels() * result.getNumSamples());
 
         // ------------------------------------------------
 
 		for (int channel = 0; channel < result.getNumChannels(); ++channel) {
             for (int i = 0; i < result.getNumSamples(); ++i) {
-                const int relativeIndex = select.start + i;
+                const int relativeIndex = static_cast<int>(select.start) + i;
                 const int index = static_cast<int>(doReverse ? select.end() - 1 - i : relativeIndex);
 
                 float sample = 0.f;
@@ -422,12 +471,15 @@ namespace Kaixo::Processing {
                 } else {
                     result.setSample(channel, i, sample);
                 }
+
+                m_TransformProgress.step();
+                if (m_TransformCanceled) return;
             }
         }
         
         // ------------------------------------------------
 
-        buffer.access([&](juce::AudioBuffer<float>& bfr, float& /*sampleRate*/) { bfr = result; });
+        buffer.access([&](juce::AudioBuffer<float>& bfr, float&, std::int64_t&) { bfr = result; });
 
         // ------------------------------------------------
 
@@ -440,20 +492,37 @@ namespace Kaixo::Processing {
         KAIXO_DEBUG("Performing FFT on buffer, and saving as Mirror270");
 
         // ------------------------------------------------
-
+        
+        const std::int64_t fftSize = select.size * 2 - 1;
         juce::AudioBuffer<float> result{ from.getNumChannels(), static_cast<int>(select.size) };
 
         std::vector<std::vector<std::complex<float>>> complexBuffer{
             static_cast<std::size_t>(from.getNumChannels()), 
-            std::vector<std::complex<float>>(static_cast<std::size_t>(select.size * 2 - 1))
+            std::vector<std::complex<float>>(static_cast<std::size_t>(fftSize))
         };
+
+        // ------------------------------------------------
+
+        Fft fft{};
+        fft.progress = &m_TransformProgress;
+        fft.cancelation = &m_TransformCanceled;
+
+        // ------------------------------------------------
+
+        std::int64_t fftStepEstimate = static_cast<std::int64_t>(from.getNumChannels() * fft.estimateSteps(fftSize, true));
+        std::int64_t initializeBufferEstimate = from.getNumChannels() * from.getNumSamples();
+        std::int64_t finalizeBufferEstimate = 2 * from.getNumChannels() * from.getNumSamples();
+
+        m_TransformProgress.increaseEstimate(fftStepEstimate);
+        m_TransformProgress.increaseEstimate(initializeBufferEstimate);
+        m_TransformProgress.increaseEstimate(finalizeBufferEstimate);
 
         // ------------------------------------------------
 
         std::vector<float> sumInputs(from.getNumChannels());
         for (int channel = 0; channel < from.getNumChannels(); ++channel) {
             for (int i = 0; i < select.size; ++i) {
-                const int index = select.start + i;
+                const int index = static_cast<int>(select.start) + i;
 
                 float sample = 0.f;
                 if (index >= 0 && index < from.getNumSamples()) {
@@ -462,13 +531,16 @@ namespace Kaixo::Processing {
 
                 complexBuffer[channel][i] = sample;
                 sumInputs[channel] += sample * sample;
+
+                m_TransformProgress.step();
+                if (m_TransformCanceled) return;
             }
         }
 
         // ------------------------------------------------
 
         for (auto& channel : complexBuffer) {
-            m_Fft.transform(channel, true);
+            fft.transform(channel, true);
         }
 
         // ------------------------------------------------
@@ -479,11 +551,17 @@ namespace Kaixo::Processing {
                 float sample = complexBuffer[channel][i].real();
                 result.setSample(channel, i, sample);
                 sumOutput += sample * sample;
+
+                m_TransformProgress.step();
+                if (m_TransformCanceled) return;
             }
 
             float energyRatio = Math::Fast::sqrt(sumInputs[channel] / sumOutput);
             for (int i = 0; i < result.getNumSamples(); ++i) {
                 result.setSample(channel, i, result.getSample(channel, i) * energyRatio);
+
+                m_TransformProgress.step();
+                if (m_TransformCanceled) return;
             }
         }
 
