@@ -60,14 +60,85 @@ namespace Kaixo::Processing {
         notifyStateChanged();
     }
 
-    std::future<FileLoadResult> FileHandler::load(std::filesystem::path path) {
+    FileLoadResult decodeAny(juce::AudioBuffer<float>& buffer, std::filesystem::path path, FileLoadSettings settings) {
+        std::ifstream file(path, std::ios::binary);
+
+        if (!file) {
+            KAIXO_GLOBAL_DEBUG("Failed to open file '{}'.", Convert::pathToString(path));
+            return FileLoadResult::FailedToOpen;
+        }
+
+        std::vector<unsigned char> data(std::istreambuf_iterator<char>(file), {});
+
+        const std::size_t bytesPerSample = settings.bitDepth / 8;
+        const std::size_t channels = settings.stereo ? 2 : 1;
+        const std::size_t bytesPerFrame = bytesPerSample * channels;
+        const std::size_t frames = data.size() / bytesPerFrame;
+
+        buffer.setSize(2, static_cast<int>(frames));
+
+        const double maxValue = settings.bitDepth == 64
+            ? 18446744073709551616.0 // 2^64
+            : static_cast<double>(std::uint64_t{ 1 } << settings.bitDepth);
+
+        const auto readSample = [&](std::size_t byteOffset) {
+            std::uint64_t value = 0;
+
+            for (std::size_t b = 0; b < bytesPerSample; ++b) {
+                value |= static_cast<std::uint64_t>(data[byteOffset + b]) << (b * 8);
+            }
+
+            return static_cast<float>((value / maxValue) - 0.5);
+        };
+
+        std::size_t offset = 0;
+        for (std::size_t frame = 0; frame < frames; ++frame) {
+            float l;
+            float r;
+
+            if (settings.stereo) {
+                l = readSample(offset);
+                offset += bytesPerSample;
+
+                r = readSample(offset);
+                offset += bytesPerSample;
+            } else {
+                l = r = readSample(offset);
+                offset += bytesPerSample;
+            }
+
+            buffer.setSample(0, static_cast<int>(frame), l);
+            buffer.setSample(1, static_cast<int>(frame), r);
+        }
+
+        for (int channel = 0; channel < buffer.getNumChannels(); ++channel) {
+            auto* samples = buffer.getWritePointer(channel);
+            const int numSamples = buffer.getNumSamples();
+
+            double sum = 0.0;
+
+            for (int i = 0; i < numSamples; ++i) {
+                sum += samples[i];
+            }
+
+            const float dc = static_cast<float>(sum / numSamples);
+
+            for (int i = 0; i < numSamples; ++i) {
+                samples[i] -= dc;
+            }
+        }
+
+        return FileLoadResult::Success;
+    }
+
+    std::future<FileLoadResult> FileHandler::load(std::filesystem::path path, FileLoadSettings settings) {
         KAIXO_DEBUG("Added load '{}' to activity queue.", Convert::pathToString(path));
 
         // Cancel all other activities on a load.
         m_TransformCanceled = true;
         m_AnalyzerCanceled = true;
 
-        return m_ActivityWorker.push([this, path] {
+        return m_ActivityWorker.push([this, path, settings] {
             std::lock_guard lock{ m_Mutex };
 
             KAIXO_DEBUG("Loading file from path '{}'", Convert::pathToString(path));
@@ -76,21 +147,30 @@ namespace Kaixo::Processing {
                 m_FormatManager.createReaderFor(Convert::pathToJuceString(path)) 
             };
 
-            if (!reader) {
-                KAIXO_ERROR("Failed to create a reader for '{}'", Convert::pathToString(path));
-                return FileLoadResult::FailedToOpen;
-            }
+            float fileSampleRate = 0;
+            juce::AudioBuffer<float> newBuffer{};
 
-            juce::AudioBuffer<float> newBuffer{ static_cast<int>(reader->numChannels), static_cast<int>(reader->lengthInSamples) };
-            if (!reader->read(newBuffer.getArrayOfWritePointers(), newBuffer.getNumChannels(), 0, newBuffer.getNumSamples())) {
-                KAIXO_ERROR("Failed read data from '{}'", Convert::pathToString(path));
-                return FileLoadResult::FailedToRead;
+            if (reader) {
+                newBuffer = juce::AudioBuffer<float>{ static_cast<int>(reader->numChannels), static_cast<int>(reader->lengthInSamples) };
+                if (!reader->read(newBuffer.getArrayOfWritePointers(), newBuffer.getNumChannels(), 0, newBuffer.getNumSamples())) {
+                    KAIXO_ERROR("Failed read data from '{}'", Convert::pathToString(path));
+                    return FileLoadResult::FailedToRead;
+                }
+
+                fileSampleRate = static_cast<float>(reader->sampleRate);
+            } else {
+                KAIXO_DEBUG("Failed to create a reader for '{}', trying non-audio file approach.", Convert::pathToString(path));
+
+                auto res = decodeAny(newBuffer, path, settings);
+                if (res != FileLoadResult::Success) return res;
+
+                fileSampleRate = settings.sampleRate;
             }
 
             buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate, std::int64_t& start) {
                 // Sample rate changed mid-session, adjust the selection accordingly
-				if (m_InSession && sampleRate != static_cast<float>(reader->sampleRate)) {
-                    selection.size = static_cast<std::int64_t>(reader->lengthInSamples * reader->sampleRate / sampleRate);
+				if (m_InSession && sampleRate != fileSampleRate) {
+                    selection.size = static_cast<std::int64_t>(newBuffer.getNumSamples() * fileSampleRate / sampleRate);
                 }
 
                 // Assume new imported file was from previous export, 
@@ -100,7 +180,7 @@ namespace Kaixo::Processing {
                 m_TimelineLength = newBuffer.getNumSamples();
 
                 start = 0;
-                sampleRate = static_cast<float>(reader->sampleRate);
+                sampleRate = fileSampleRate;
                 bfr = std::move(newBuffer);
                 
                 if (!m_InSession) { // Start new session by selecting the whole buffer.

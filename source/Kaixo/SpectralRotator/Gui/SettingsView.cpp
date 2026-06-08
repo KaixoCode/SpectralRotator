@@ -47,8 +47,49 @@ namespace Kaixo::Gui {
             .transform = Transformers::Range<48.f, 144.f>,
             .resetValue = Transformers::Range<48.f, 144.f>.normalize(75.f),
         });
-
+        
         // ------------------------------------------------
+
+        add<Button>("non-audio-load-settings-title", { Width, 20 });
+
+        add<Knob>("bit-depth", { Width, 20 }, {
+            .onchange = [this](ParamValue val) { Config::UserSettings["bit-depth"] = val; updateFileLoadSettings(); },
+            .name = "Bit Depth",
+            .steps = 8,
+            .format = Formatters::Group<"8", "16", "24", "32", "40", "48", "56", "64">,
+            .transform = Transformers::Group<8>,
+            .resetValue = Convert::indexToParam(1, 8),
+        });
+
+        add<Knob>("sample-rate", { Width, 20 }, {
+            .onchange = [this](ParamValue val) { Config::UserSettings["sample-rate"] = val; updateFileLoadSettings(); },
+            .name = "Sample Rate",
+            .steps = 6,
+            .format = Formatters::Group<"8kHz", "11.025kHz", "16kHz", "22.05kHz", "44.1kHz", "48kHz">,
+            .transform = Transformers::Group<6>,
+            .resetValue = Convert::indexToParam(5, 6),
+        });
+
+        add<Button>("stereo", { Width, 20 }, {
+            .callback = [this](bool val) { Config::UserSettings["stereo"] = val; updateFileLoadSettings(); },
+            .behaviour = Button::Behaviour::Toggle,
+            .text = "Stereo",
+        });
+        
+        // ------------------------------------------------
+
+        add<Button>("generation-directory-title", { Width, 20 }, {
+            .callback = [](bool) {
+                std::string pathStr;
+                if (Config::UserSettings["generation-directory"].try_get(pathStr)) {
+                    std::filesystem::path path = Convert::stringToPath(pathStr);
+                    juce::File file{ Convert::pathToJuceString(path) };
+                    if (file.isDirectory()) {
+                        file.startAsProcess();
+                    }
+                }
+            }
+        });
 
         auto& gen = add<Button>("generation-directory", { Width, 20 }, {
             .callback = [this](bool) { chooseGenerationDirectory(); },
@@ -59,6 +100,7 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
 
         updateAnalyzeSettings();
+        updateFileLoadSettings();
 
         // ------------------------------------------------
 
@@ -71,6 +113,27 @@ namespace Kaixo::Gui {
     }
 
     // ------------------------------------------------
+
+    void SettingsView::updateFileLoadSettings() {
+        if (auto bitDepth = Config::UserSettings["bit-depth"].get<float>()) {
+            constexpr int Values[]{ 8, 16, 24, 32, 40, 48, 56, 64 };
+            if (auto knob = find<Knob>("bit-depth")) knob->get().value(*bitDepth);
+            fileLoadSettings.bitDepth = Values[Math::clamp(Convert::paramToIndex(*bitDepth, 8), 0, 7)];
+        }
+
+        if (auto sampleRate = Config::UserSettings["sample-rate"].get<float>()) {
+            constexpr float Values[]{ 8000.f, 11025.f, 16000.f, 22050.f, 44100.f, 48000.f };
+            if (auto knob = find<Knob>("sample-rate")) knob->get().value(*sampleRate);
+            fileLoadSettings.sampleRate = Values[Math::clamp(Convert::paramToIndex(*sampleRate, 6), 0, 5)];
+        }
+
+        if (auto stereo = Config::UserSettings["stereo"].get<bool>()) {
+            if (auto knob = find<Button>("stereo")) knob->get().set(*stereo);
+            fileLoadSettings.stereo = *stereo;
+        }
+
+        context.window().notifyListeners(&SettingsListener::updateFileLoadSettings, fileLoadSettings);
+    }
 
     void SettingsView::updateAnalyzeSettings() {
         if (auto fftSize = Config::UserSettings["fft-size"].get<float>()) {

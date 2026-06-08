@@ -87,7 +87,7 @@ namespace Kaixo::Processing {
 
             @returns the load result.
          */
-        std::future<FileLoadResult> load(std::filesystem::path path);
+        std::future<FileLoadResult> load(std::filesystem::path path, FileLoadSettings settings);
 
         /** Used to signal progress of the transform activity.
 

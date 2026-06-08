@@ -37,6 +37,7 @@ namespace Kaixo::Gui {
         // ------------------------------------------------
 
         void updateAnalyzeSettings(const Processing::AnalyzeSettings& v) override;
+        void updateFileLoadSettings(const Processing::FileLoadSettings& v) override;
 
         // ------------------------------------------------
 
@@ -51,6 +52,7 @@ namespace Kaixo::Gui {
         Point<float> m_ZoomMillis{}; // Range of the audio file that it's zoomed in on.
         std::atomic_bool m_AnalyzeDirty = false;
         Processing::AnalyzeSettings m_AnalyzeSettings{};
+        Processing::FileLoadSettings m_FileLoadSettings{};
         std::size_t m_StateCounter = 0;
 
         // ------------------------------------------------

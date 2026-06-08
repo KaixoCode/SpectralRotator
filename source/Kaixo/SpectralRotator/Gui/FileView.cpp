@@ -275,6 +275,11 @@ namespace Kaixo::Gui {
         scheduleAnalyze();
     }
 
+    void FileView::updateFileLoadSettings(const Processing::FileLoadSettings& v) {
+        KAIXO_DEBUG("File load settings updated!");
+        m_FileLoadSettings = v;
+    }
+
     // ------------------------------------------------
 
     void FileView::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& d) {
@@ -390,7 +395,7 @@ namespace Kaixo::Gui {
 
     void FileView::filesDropped(const juce::StringArray& files, int /*x*/, int /*y*/) {
         if (isInterestedInFileDrag(files)) {
-            m_LoadFuture = interface->load(Convert::juceStringToPath(files[0]));
+            m_LoadFuture = interface->load(Convert::juceStringToPath(files[0]), m_FileLoadSettings);
         }
     }
 

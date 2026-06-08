@@ -20,6 +20,15 @@ namespace Kaixo::Processing {
 
     // ------------------------------------------------
 
+    struct FileLoadSettings {
+        // Settings for loading non-audio files:
+        std::size_t bitDepth = 32; // Bits per sample
+        float sampleRate = 48000;  // Samples per second
+        bool stereo = false;       // Interpret as stereo signal
+    };
+
+    // ------------------------------------------------
+
     enum class FileLoadResult {
         Success = 0,
         FailedToOpen = 1,
@@ -74,7 +83,7 @@ namespace Kaixo::Processing {
 
 			@returns true if the file was successfully loaded.
          */
-        std::future<FileLoadResult> load(std::filesystem::path path);
+        std::future<FileLoadResult> load(std::filesystem::path path, FileLoadSettings settings);
 
         /** Save the audio buffer to the folder configured in the user settings,
             and return the path to the file.

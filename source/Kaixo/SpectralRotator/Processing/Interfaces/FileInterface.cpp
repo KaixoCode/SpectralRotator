@@ -76,9 +76,9 @@ namespace Kaixo::Processing {
         return processor.file.transformProgress();
     }
 
-    std::future<FileLoadResult> AudioBufferInterface::load(std::filesystem::path path) {
+    std::future<FileLoadResult> AudioBufferInterface::load(std::filesystem::path path, FileLoadSettings settings) {
         auto& processor = self<SpectralRotatorProcessor>();
-        return processor.file.load(path);
+        return processor.file.load(path, settings);
     }
 
     float AudioBufferInterface::loadProgress() {

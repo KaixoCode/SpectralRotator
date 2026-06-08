@@ -111,6 +111,14 @@ namespace Kaixo::Gui {
         if (e.mods.isMiddleButtonDown()) {
             m_DragMode = DragMode::Scroll;
             m_ZoomDragStart = m_Zoom;
+        } else if (e.mods.isShiftDown() || e.mods.isRightButtonDown()) {
+            m_DragMode = DragMode::End;
+
+            auto sample = xToSample(e.position.x);
+            m_Selection.start = Math::clamp(sample, 0, bufferSize());
+            m_Selection.size = 1;
+
+            update();
         } else if (topDragablePosition().contains(e.position)) {
             m_DragMode = DragMode::Drag;
         } else if (endHandlePosition().contains(e.position)) {
@@ -261,9 +269,7 @@ namespace Kaixo::Gui {
     // ------------------------------------------------
 
     Rect<float> SelectionDisplay::topDragablePosition() {
-        const auto x1 = sampleToX(m_Selection.start);
-        const auto x2 = sampleToX(m_Selection.start + m_Selection.size);
-        return { x1, 0.0f, static_cast<float>(x2 - x1), static_cast<float>(topHeight) };
+        return { 0.f, 0.0f, width(), static_cast<float>(topHeight)};
     }
 
     Rect<float> SelectionDisplay::startHandlePosition() {

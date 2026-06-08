@@ -22,6 +22,7 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
+        Processing::FileLoadSettings fileLoadSettings;
         Processing::AnalyzeSettings analyzeSettings;
 
         // ------------------------------------------------
@@ -34,6 +35,7 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
+        void updateFileLoadSettings();
         void updateAnalyzeSettings();
 
         // ------------------------------------------------

@@ -341,7 +341,6 @@ settings: {
     }]
   }
   $setting: {
-    
     background-color: {
       transition: $transition
       value: [255, 0]
@@ -353,10 +352,10 @@ settings: {
     text-color: [255]
 
     texts: [{
-      position: [120, 0]
+      position: [120, 1]
       text: $value
     }, {
-      position: [0, 0]
+      position: [8, 1]
       text: $name
     }]
   }
@@ -364,17 +363,76 @@ settings: {
   settings-title: {
     font: $main-font
     text-align: top-left
-    text-color: [255]
-    position: [0, 0]
+    text-color: [211]
+    text-position: [4, 0]
     text: Settings
+    rect: {
+      dimensions: [0, 19, "$width", 1]
+      fill: [255, 30]
+    }
+  }
+
+  non-audio-load-settings-title: {
+    font: $main-font
+    text-align: top-left
+    text-color: [211]
+    text-position: [4, 0]
+    text: Non-Audio File Load Settings
+    rect: {
+      dimensions: [0, 19, "$width", 1]
+      fill: [255, 30]
+    }
   }
 
   fft-size: $setting
   fft-resolution: $setting
   fft-block-size: $setting
   fft-range: $setting
-  generation-directory: {
+  bit-depth: $setting
+  sample-rate: $setting
+  stereo: {
+    background-color: {
+      transition: $transition
+      value: [255, 0]
+      hovering: [255, 10]
+    }
     
+    font: $main-font
+    text-align: top-left
+    text-color: [255]
+
+    texts: [{
+      position: [120, 1]
+      text: Off
+      selected: {
+        content: On
+      }
+    }, {
+      position: [8, 1]
+      text: Stereo
+    }]
+  }
+
+  generation-directory-title: {
+    font: $main-font
+    text-align: top-left
+    text-color: [211]
+    text-position: [4, 1]
+    text: Generation Directory
+    image: open-folder.png
+    image-align: top-right
+    image-position: [0, 0]
+    image-color: {
+      transition: $transition
+      value: [211]
+      hovering: [255]
+    }
+    rect: {
+      dimensions: [0, 19, "$width - 23", 1]
+      fill: [255, 30]
+    }
+  }
+  generation-directory: {
     background-color: {
       transition: $transition
       value: [255, 0]
@@ -386,12 +444,9 @@ settings: {
     text-color: [255]
     
     texts: [{
-      position: [55, 0]
+      position: [8, 1]
       text-overflow: dots
       text: $text
-    }, {
-      position: [0, 0]
-      text: Output:
     }]
   }
 }
