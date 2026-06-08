@@ -46,7 +46,7 @@ namespace Kaixo::Gui {
 
             m_PendingFile = path;
 
-            juce::DragAndDropContainer::performExternalDragDropOfFiles({ Convert::pathToJuceString(m_PendingFile) }, true);
+            juce::DragAndDropContainer::performExternalDragDropOfFiles({ Convert::pathToJuceString(m_PendingFile) }, false);
         }
     }
 

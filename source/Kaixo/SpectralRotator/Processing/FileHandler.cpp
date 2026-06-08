@@ -150,6 +150,7 @@ namespace Kaixo::Processing {
             float fileSampleRate = 0;
             juce::AudioBuffer<float> newBuffer{};
 
+            bool readFromAudioFile = true;
             if (reader) {
                 newBuffer = juce::AudioBuffer<float>{ static_cast<int>(reader->numChannels), static_cast<int>(reader->lengthInSamples) };
                 if (!reader->read(newBuffer.getArrayOfWritePointers(), newBuffer.getNumChannels(), 0, newBuffer.getNumSamples())) {
@@ -165,6 +166,7 @@ namespace Kaixo::Processing {
                 if (res != FileLoadResult::Success) return res;
 
                 fileSampleRate = settings.sampleRate;
+                readFromAudioFile = false;
             }
 
             buffer.access([&](juce::AudioBuffer<float>& bfr, float& sampleRate, std::int64_t& start) {
@@ -195,8 +197,15 @@ namespace Kaixo::Processing {
                 m_CurrentTransform = Transform::Identity;
             });
 
-            m_LoadedFile = path;
-            m_SavedFile = path;
+            if (readFromAudioFile) {
+                // Only use original file path as saved file if it was an audio file.
+                m_LoadedFile = path;
+                m_SavedFile = path; 
+            } else {
+                m_LoadedFile.clear();
+                m_SavedFile.clear();
+            }
+
             m_OriginalFileName = Convert::pathToString(path.stem());
 
             notifyStateChanged();
