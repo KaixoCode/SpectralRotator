@@ -108,7 +108,7 @@ namespace Kaixo::Gui {
 
                 for (int x = 0; x < width(); ++x) {
                     double samplePos = Math::remap(x, 0.0, width() - 1.0, startSample, endSample);
-                    int center = samplePos;
+                    int center = static_cast<int>(samplePos);
                     float r = static_cast<float>(samplePos - center);
 
                     float value = useSinc ? sampleAtSinc(bfr, center, r) : sampleAtLinear(bfr, center, r);

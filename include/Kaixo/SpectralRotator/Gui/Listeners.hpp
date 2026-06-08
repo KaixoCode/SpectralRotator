@@ -43,8 +43,8 @@ namespace Kaixo::Gui {
 
     class SettingsListener : public virtual Listener {
     public:
-        virtual void updateAnalyzeSettings(const Processing::AnalyzeSettings& v) {};
-        virtual void updateFileLoadSettings(const Processing::FileLoadSettings& v) {};
+        virtual void updateAnalyzeSettings(const Processing::AnalyzeSettings&) {};
+        virtual void updateFileLoadSettings(const Processing::FileLoadSettings&) {};
     };
 
     // ------------------------------------------------

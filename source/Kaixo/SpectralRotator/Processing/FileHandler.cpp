@@ -400,7 +400,7 @@ namespace Kaixo::Processing {
             const std::int64_t size = buffer.size();
             const std::int64_t blockSize = static_cast<std::int64_t>(settings.fftSize);
             const float distanceBetweenBlocks = Math::max(+Convert::millisToSamples(settings.fftResolution, sampleRate), 1);
-            const std::int64_t blocks = Math::ceil(size / distanceBetweenBlocks);
+            const std::int64_t blocks = static_cast<std::int64_t>(Math::ceil(size / distanceBetweenBlocks));
             const std::int64_t frequencyBins = settings.fftSize / 2 + 1;
 
             // ------------------------------------------------

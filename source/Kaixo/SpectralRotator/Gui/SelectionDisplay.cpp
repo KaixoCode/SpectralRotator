@@ -182,27 +182,27 @@ namespace Kaixo::Gui {
             const float mouseRatio = e.mouseDownPosition.x / static_cast<float>(width());
             const float anchorMs = m_ZoomDragStart.x() + mouseRatio * startVisibleLength;
 
-            float start = anchorMs - mouseRatio * newVisibleLength;
-            float end = start + newVisibleLength;
+            float newZoomStart = anchorMs - mouseRatio * newVisibleLength;
+            float newZoomEnd = newZoomStart + newVisibleLength;
 
-            start -= relativeMillis;
-            end   -= relativeMillis;
+            newZoomStart -= relativeMillis;
+            newZoomEnd -= relativeMillis;
 
-            if (start < 0.0f) {
-                end -= start;
-                start = 0.0f;
+            if (newZoomStart < 0.0f) {
+                newZoomEnd -= newZoomStart;
+                newZoomStart = 0.0f;
             }
 
-            if (end > totalLengthMs) {
-                start -= (end - totalLengthMs);
-                end = totalLengthMs;
+            if (newZoomEnd > totalLengthMs) {
+                newZoomStart -= (newZoomEnd - totalLengthMs);
+                newZoomEnd = totalLengthMs;
 
-                if (start < 0.0f) {
-                    start = 0.0f;
+                if (newZoomStart < 0.0f) {
+                    newZoomStart = 0.0f;
                 }
             }
 
-            m_Zoom = { start, end };
+            m_Zoom = { newZoomStart, newZoomEnd };
             context.window().notifyListeners(&BufferZoomListener::zoomChanged, m_Zoom);
             break;
         }

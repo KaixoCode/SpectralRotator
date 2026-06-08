@@ -179,15 +179,13 @@ namespace Kaixo::Processing {
 
     std::size_t estimateBluestein(std::size_t size, bool inverse);
     std::size_t estimateRadix2(std::size_t size, bool inverse);
-    std::size_t estimateFft(std::size_t size, bool inverse) {
-        size_t n = size;
+    std::size_t estimateFft(std::size_t n, bool inverse) {
         if (n == 0) return 0;
-        else if ((n & (n - 1)) == 0) return estimateRadix2(size, inverse);
-        else return estimateBluestein(size, inverse);
+        else if ((n & (n - 1)) == 0) return estimateRadix2(n, inverse);
+        else return estimateBluestein(n, inverse);
     }
 
-    std::size_t estimateRadix2(std::size_t size, bool inverse) {
-        std::size_t n = size;
+    std::size_t estimateRadix2(std::size_t n, bool /*inverse*/) {
         std::size_t steps = 0;
         for (size_t size = 2; size <= n; size *= 2) {
             size_t halfsize = size / 2;
@@ -205,9 +203,8 @@ namespace Kaixo::Processing {
             steps; // Cooley-Tukey
     }
     
-    std::size_t estimateBluestein(std::size_t size, bool inverse) {
-        size_t n = size;
-        size_t m = std::bit_ceil(n * 2 + 1);
+    std::size_t estimateBluestein(std::size_t n, bool inverse) {
+        std::size_t m = std::bit_ceil(n * 2 + 1);
 
         return n + // Trig table
             n + n - 1 + // Preprocessing
@@ -215,8 +212,8 @@ namespace Kaixo::Processing {
             estimateRadix2(m, inverse) * 3; // in the convolve
     }
 
-    std::size_t Fft::estimateSteps(std::size_t size, bool inverse) {
-        return estimateFft(size, inverse);
+    std::size_t Fft::estimateSteps(std::size_t n, bool inverse) {
+        return estimateFft(n, inverse);
     }
 
     // ------------------------------------------------

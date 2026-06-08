@@ -27,7 +27,7 @@ namespace Kaixo::Processing {
             return m_File.read(m_PlaybackPosition);
         });
 
-		if (m_PlaybackPosition >= m_File.size()) {
+		if (m_PlaybackPosition >= static_cast<std::int64_t>(m_File.size())) {
             m_Playing = false;
             m_PlaybackPosition = 0;
         }
