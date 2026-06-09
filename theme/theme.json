@@ -384,6 +384,31 @@ settings: {
     }
   }
 
+  info-title: {
+    font: $main-font
+    text-align: top-left
+    text-color: [211]
+    text-position: [4, 0]
+    text: Plugin Information
+    rect: {
+      dimensions: [0, 19, "$width", 1]
+      fill: [255, 30]
+    }
+  }
+
+  version: {
+    font: $main-font
+    text-align: top-left
+    text-color: [255]
+    texts: [{
+      position: [120, 1]
+      text: $text
+    }, {
+      position: [8, 1]
+      text: Version
+    }]
+  }
+
   fft-size: $setting
   fft-resolution: $setting
   fft-block-size: $setting

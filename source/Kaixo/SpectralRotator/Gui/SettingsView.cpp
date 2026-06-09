@@ -99,6 +99,14 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
+        add<Button>("info-title", { Width, 20 });
+
+        add<Button>("version", { Width, 20 }, {
+            .text = SYNTH_FullVersion    
+        });
+
+        // ------------------------------------------------
+
         updateAnalyzeSettings();
         updateFileLoadSettings();
 
