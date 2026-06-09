@@ -1,0 +1,154 @@
+name: CMake VST3 Build and Release (Windows + macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., 1.0.0)'
+        required: true
+        default: '0.0.1'
+      version_type:
+        description: 'Version type (SNAPSHOT, DEMO, RELEASE)'
+        required: true
+        default: 'RELEASE'
+
+env:
+  PROJECT_NAME: SpectralRotator
+
+permissions:
+  contents: write
+  
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+        build_type: [Release]
+        include:
+          - os: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Import macOS signing certificate
+        if: matrix.os == 'macos-latest'
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
+
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          security import cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      - name: Configure CMake
+        run: >
+          cmake -B build
+          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -DVERSION="${{ github.event.inputs.tag }}"
+          -DVERSION_TYPE="${{ github.event.inputs.version_type }}"
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -S ${{ github.workspace }}
+
+      - name: Build
+        run: cmake --build build --target ${{ env.PROJECT_NAME }}_VST3 --config ${{ matrix.build_type }}
+
+      - name: Package VST3
+        run: |
+          mkdir -p package
+          cp -R build/core/${{ env.PROJECT_NAME }}_artefacts/Release/VST3/${{ env.PROJECT_NAME }}.vst3 package/
+        shell: bash
+
+      - name: Sign and notarize VST3 (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          VST3_PATH="package/${{ env.PROJECT_NAME }}.vst3"
+
+          echo "Signing..."
+          codesign --force --deep --options runtime \
+            --sign "Developer ID Application: ${{ secrets.DEVELOPER_ID_NAME }} (${{ secrets.APPLE_TEAM_ID }})" \
+            "$VST3_PATH"
+
+          echo "Zipping for notarization..."
+          ditto -c -k --keepParent "$VST3_PATH" ${{ env.PROJECT_NAME }}.zip
+
+          echo "Submitting for notarization..."
+          xcrun notarytool submit ${{ env.PROJECT_NAME }}.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+
+          echo "Stapling..."
+          xcrun stapler staple "$VST3_PATH"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vst3-${{ matrix.os }}
+          path: package/*
+
+  attach-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+
+      # Zip all VST3 folders
+      - name: Zip VST3 folders
+        shell: bash
+        run: |
+          mkdir -p zips
+          (
+            cd "./dist/vst3-windows-latest" || exit 1
+            zip -r "../../zips/${{ env.PROJECT_NAME }}-vst3-windows-${{ github.event.inputs.tag }}.zip" "${{ env.PROJECT_NAME }}.vst3"
+          )
+          (
+            cd "./dist/vst3-macos-latest" || exit 1
+            zip -r "../../zips/${{ env.PROJECT_NAME }}-vst3-macos-${{ github.event.inputs.tag }}.zip" "${{ env.PROJECT_NAME }}.vst3"
+          )
+   
+      # Create the release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}${{ github.event.inputs.version_type == 'DEMO' && '-demo' || '' }}
+          release_name: Release ${{ github.event.inputs.tag }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload zip files to the release
+      - name: Upload release assets
+        run: gh release upload "${{ github.event.inputs.tag }}${{ github.event.inputs.version_type == 'DEMO' && '-demo' || '' }}" ./zips/* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
