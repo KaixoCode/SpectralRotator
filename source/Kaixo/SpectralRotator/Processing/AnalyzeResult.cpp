@@ -10,8 +10,7 @@ namespace Kaixo::Processing {
     // ------------------------------------------------
 
     float AnalyzeResult::intensityAt(float millis, float normalizedFrequency) {
-        const float fftMillis = Convert::samplesToMillis(settings.fftSize, sampleRate);
-        const float block = (millis - fftMillis / 2) / settings.fftResolution;
+        const float block = millis / settings.fftResolution;
         const float bin = normalizedFrequency * (settings.fftSize / 2);
         const std::int64_t nofBlocks = static_cast<std::int64_t>(blocks.size());
 

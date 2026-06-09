@@ -410,7 +410,8 @@ namespace Kaixo::Processing {
             // ------------------------------------------------
 
             const float sampleRate = buffer.sampleRate();
-            const std::int64_t size = buffer.size();
+            const std::int64_t fftLatencyAdjust = settings.fftSize / 2;
+            const std::int64_t size = buffer.size() + fftLatencyAdjust;
             const std::int64_t blockSize = static_cast<std::int64_t>(settings.fftSize);
             const float distanceBetweenBlocks = Math::max(Convert::millisToSamples(settings.fftResolution, sampleRate).value, 1);
             const std::int64_t blocks = static_cast<std::int64_t>(Math::ceil(size / distanceBetweenBlocks));
@@ -455,7 +456,7 @@ namespace Kaixo::Processing {
                 std::memset(fftBuffer.data(), 0, settings.fftSize * sizeof(std::complex<float>));
                 float windowScaleAdjustment = 0;
                 for (std::int64_t sampleInBlock = 0; sampleInBlock < blockSize; ++sampleInBlock) {
-                    std::int64_t sample = sampleStartOfBlock + sampleInBlock;
+                    std::int64_t sample = sampleStartOfBlock + sampleInBlock - fftLatencyAdjust;
 
                     float sinWindow = 0.5f * (1.0f - Math::Fast::ncos(static_cast<float>(sampleInBlock) / (blockSize - 1)));
                     windowScaleAdjustment += sinWindow;
