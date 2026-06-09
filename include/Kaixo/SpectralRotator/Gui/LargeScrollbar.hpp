@@ -38,7 +38,8 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        LargeScrollbar(Context c, Settings s = {});
+        LargeScrollbar(Context c) : LargeScrollbar(c, Settings()) {}
+        LargeScrollbar(Context c, Settings s);
 
         // ------------------------------------------------
 
