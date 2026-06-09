@@ -23,15 +23,10 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        AudioFileImage refreshImage(Point<float> visible) override;
+        AudioFileImage refreshImage(Point<float> visible, Point<int> size) override;
 
         // ------------------------------------------------
         
-    private:
-        float sampleToY(float sample) const;
-
-        // ------------------------------------------------
-
     };
 
     // ------------------------------------------------

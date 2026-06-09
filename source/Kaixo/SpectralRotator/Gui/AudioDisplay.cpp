@@ -93,9 +93,10 @@ namespace Kaixo::Gui {
         if (m_Dirty && !m_RefreshFuture.valid()) {
             KAIXO_DEBUG("Image was marked as dirty, triggering new refresh.");
             m_Dirty = false;
-            m_RefreshFuture = m_RefreshPool.push([this, visible = visibleMillis()] {
+            if (width() <= 0 || height() <= 0) return; // Invalid size
+            m_RefreshFuture = m_RefreshPool.push([this, visible = visibleMillis(), imageSize = size()] {
                 KAIXO_DEBUG("Refreshing image.");
-                auto result = refreshImage(visible);
+                auto result = refreshImage(visible, imageSize);
                 {
                     auto _ = m_ImageLock.write();
                     m_Image = std::move(result);

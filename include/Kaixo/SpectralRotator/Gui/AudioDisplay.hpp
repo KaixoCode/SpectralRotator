@@ -50,7 +50,7 @@ namespace Kaixo::Gui {
 
         // ------------------------------------------------
 
-        virtual AudioFileImage refreshImage(Point<float> visible) = 0;
+        virtual AudioFileImage refreshImage(Point<float> visible, Point<int> size) = 0;
 
         // ------------------------------------------------
 

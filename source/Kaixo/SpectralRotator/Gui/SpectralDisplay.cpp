@@ -24,15 +24,15 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    AudioFileImage SpectralDisplay::refreshImage(Point<float> visible) {
+    AudioFileImage SpectralDisplay::refreshImage(Point<float> visible, Point<int> size) {
         KAIXO_DEBUG("Refreshing image with zoom {} {}.", visible.x(), visible.y());
 
         m_AnalyzeResultMutex.lock();
         Processing::AnalyzeResult analyzeResult = m_AnalyzeResult; // Working copy
         m_AnalyzeResultMutex.unlock();
 
-        const int w = width();
-        const int h = height();
+        const int w = size.x();
+        const int h = size.y();
 
         AudioFileImage result;
         result.image = juce::Image{ juce::Image::PixelFormat::ARGB, w, h, true, juce::SoftwareImageType()};

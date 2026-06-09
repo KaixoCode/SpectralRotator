@@ -55,11 +55,14 @@ namespace Kaixo::Gui {
 
     // ------------------------------------------------
 
-    AudioFileImage WaveformDisplay::refreshImage(Point<float> visible) {
+    AudioFileImage WaveformDisplay::refreshImage(Point<float> visible, Point<int> size) {
         KAIXO_DEBUG("Refreshing image with zoom {} {}.", visible.x(), visible.y());
 
+        const int w = size.x();
+        const int h = size.y();
+
         AudioFileImage result;
-        result.image = juce::Image{ juce::Image::PixelFormat::ARGB, width(), height(), true, juce::SoftwareImageType() };
+        result.image = juce::Image{ juce::Image::PixelFormat::ARGB, w, h, true, juce::SoftwareImageType() };
         result.selection = visible;
 
         auto& buffer = interface->buffer();
@@ -72,17 +75,21 @@ namespace Kaixo::Gui {
         float endSample = Convert::millisToSamples(endMillis, sampleRate);
         float visibleSamples = endSample - startSample;
 
-        float samplesPerPixel = visibleSamples / Math::max(1.f, width());
+        float samplesPerPixel = visibleSamples / Math::max(1.f, w);
 
         juce::Graphics g(result.image);
         g.setColour(stroke);
 
+        auto sampleToY = [&](float sample) {
+            return Math::remap(Math::clamp11(sample), -1.f, 1.f, h, 0.f);
+        };
+
         interface->buffer().access([&](Processing::SafeAudioBuffer::ReadBuffer bfr) {
             // draw min/max envelope
             if (samplesPerPixel > 1.f) {
-                for (int x = 0; x < width(); ++x) {
-                    float s0 = Math::remap(x, 0.f, width(), startSample, endSample);
-                    float s1 = Math::remap(x + 1, 0.f, width(), startSample, endSample);
+                for (int x = 0; x < w; ++x) {
+                    float s0 = Math::remap(x, 0.f, w, startSample, endSample);
+                    float s1 = Math::remap(x + 1, 0.f, w, startSample, endSample);
                     int start = static_cast<int>(Math::floor(s0));
                     int end = static_cast<int>(Math::max(start + 1, Math::ceil(s1))); 
                     
@@ -106,8 +113,8 @@ namespace Kaixo::Gui {
 
                 bool useSinc = samplesPerPixel < 1.f;
 
-                for (int x = 0; x < width(); ++x) {
-                    double samplePos = Math::remap(x, 0.0, width() - 1.0, startSample, endSample);
+                for (int x = 0; x < w; ++x) {
+                    double samplePos = Math::remap(x, 0.0, w - 1.0, startSample, endSample);
                     int center = static_cast<int>(samplePos);
                     float r = static_cast<float>(samplePos - center);
 
@@ -125,7 +132,7 @@ namespace Kaixo::Gui {
                     for (int sample = static_cast<int>(startSample); sample < endSample; ++sample) {
                         float a = bfr[sample].average();
 
-                        float x = static_cast<float>(Math::remap(sample, startSample, endSample, double(0.0), width()));
+                        float x = static_cast<float>(Math::remap(sample, startSample, endSample, double(0.0), w));
                         float y = sampleToY(a);
 
                         g.fillEllipse({ x - 2, y - 2, 4, 4 });
@@ -135,12 +142,6 @@ namespace Kaixo::Gui {
         });
 
         return result;
-    }
-    
-    // ------------------------------------------------
-
-    float WaveformDisplay::sampleToY(float sample) const {
-        return Math::remap(Math::clamp11(sample), -1.f, 1.f, height(), 0.f);
     }
 
     // ------------------------------------------------
