@@ -176,16 +176,17 @@ namespace Kaixo::Processing {
                     selection.size = static_cast<std::int64_t>(newBuffer.getNumSamples() * fileSampleRate / sampleRate);
                 }
 
-                // Assume new imported file was from previous export, 
-                // so start of the file is the start of our selection.
-                selection.start = 0;
-                m_IdentityBufferOffset = 0;
-                m_TimelineLength = newBuffer.getNumSamples();
-
                 start = 0;
                 sampleRate = fileSampleRate;
                 bfr = std::move(newBuffer);
-                
+
+                // Assume new imported file was from previous export, 
+                // so start of the file is the start of our selection.
+                selection.start = 0;
+                selection.size = Math::min(selection.size, bfr.getNumSamples());
+                m_IdentityBufferOffset = 0;
+                m_TimelineLength = bfr.getNumSamples();
+
                 if (!m_InSession) { // Start new session by selecting the whole buffer.
                     KAIXO_DEBUG("Starting a new session.");
                     selection = { 0, bfr.getNumSamples() };

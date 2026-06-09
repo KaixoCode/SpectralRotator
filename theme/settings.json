@@ -1,0 +1,123 @@
+
+// ------------------------------------------------
+
+background: {
+  rect-dimensions: [0, 0, "$width - 8", "$height"]
+  rect-fill: {
+    start: [0, 0]
+    end: ["$width", "$height"]
+    radial: false
+    colors: [
+      { hsl: ["$hue", "$sat", 20] }
+      { hsl: ["$hue", "$sat", 19] }
+      { hsl: ["$hue", "$sat", 21] }
+    ]
+  }
+}
+
+// ------------------------------------------------
+
+$setting: {
+  background-color: {
+    transition: $transition
+    value: [255, 0]
+    hovering: [255, 10]
+  }
+  
+  font: $main-font
+  text-align: top-left
+  text-color: [255]
+
+  texts: [{
+    position: [120, 1]
+    text: $value
+  }, {
+    position: [8, 1]
+    text: $name
+  }]
+}
+
+// ------------------------------------------------
+
+$title: {
+  font: $main-font
+  text-align: top-left
+  text-color: [211]
+  text-position: [4, 0]
+  rect: {
+    dimensions: [0, 19, "$width", 1]
+    fill: [255, 30]
+  }
+}
+
+settings-title: {
+  extends: $title
+  text: Settings
+}
+
+non-audio-load-settings-title: {
+  extends: $title
+  text: Non-Audio File Load Settings
+}
+
+info-title: {
+  extends: $title
+  text: Plugin Information
+}
+
+generation-directory-title: {
+  extends: $title
+  text: Generation Directory
+  image: images/open-folder.png
+  image-align: top-right
+  image-position: [0, 0]
+  image-color: {
+    transition: $transition
+    value: [211]
+    hovering: [255]
+  }
+  rect-dimensions: [0, 19, "$width - 23", 1]
+}
+
+// ------------------------------------------------
+
+fft-size: $setting
+fft-resolution: $setting
+fft-range: $setting
+bit-depth: $setting
+sample-rate: $setting
+stereo: {
+  extends: $setting
+  texts: [{
+    position: [120, 1]
+    text: Off
+    selected: {
+      content: On
+    }
+  }, {
+    position: [8, 1]
+    text: Stereo
+  }]
+}
+
+generation-directory: {
+  extends: $setting
+  texts: [{
+    position: [8, 1]
+    text-overflow: dots
+    text: $text
+  }]
+}
+
+version: {
+  extends: $setting
+  texts: [{
+    position: [120, 1]
+    text: $text
+  }, {
+    position: [8, 1]
+    text: Version
+  }]
+}
+
+// ------------------------------------------------

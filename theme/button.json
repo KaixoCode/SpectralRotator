@@ -1,0 +1,16 @@
+image: $icon
+edges: [1, 1, 1, 1]
+image-clip: [0, 0, 772, 772]
+image-position: [0, 0, 20, 20]
+image-align: center
+image-color: {
+  transition: $transition
+  value: [211]
+  disabled: [128]
+}
+background-color: {
+  transition: $transition
+  value: [255, 0]
+  hovering: [255, 20]
+  disabled: [255, 0]
+}
