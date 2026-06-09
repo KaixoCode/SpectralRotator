@@ -160,11 +160,12 @@ namespace Kaixo::Processing {
         std::filesystem::path m_LoadedFile{};
         std::filesystem::path m_SavedFile{};
         std::string m_OriginalFileName{};
-        std::atomic_bool m_AnalyzerCanceled = false;
-        std::atomic_bool m_TransformCanceled = false;
 
         // ------------------------------------------------
 
+        std::atomic_bool m_LoadCanceled = false;
+        std::atomic_bool m_AnalyzerCanceled = false;
+        std::atomic_bool m_TransformCanceled = false;
         ProgressCounter m_LoadProgress{};
         ProgressCounter m_SaveProgress{};
         ProgressCounter m_AnalyzeProgress{};
@@ -187,6 +188,9 @@ namespace Kaixo::Processing {
 			@param buffer           the buffer to perform the transform on.
          */
         void performFft(Selection select, const juce::AudioBuffer<float>& buffer);
+
+        // Normalizes the current buffer.
+        void performNormalize(ProgressCounter& progress, std::atomic_bool& cancelled);
 
         // ------------------------------------------------
 

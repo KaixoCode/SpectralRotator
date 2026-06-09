@@ -31,6 +31,7 @@ namespace Kaixo::Processing {
 
         AnalyzeSettings settings;
         std::vector<AnalyzeBlock> blocks;
+        float sampleRate;
 
         // ------------------------------------------------
 

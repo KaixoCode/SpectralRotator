@@ -32,6 +32,7 @@ namespace Kaixo::Processing {
     FileHandler::~FileHandler() {
         m_AnalyzerCanceled = true;
         m_TransformCanceled = true;
+        m_LoadCanceled = true;
     }
 
     // ------------------------------------------------
@@ -196,6 +197,8 @@ namespace Kaixo::Processing {
                 m_Cache.store(Transform::Identity, bfr);
                 m_CurrentTransform = Transform::Identity;
             });
+
+            performNormalize(m_LoadProgress, m_LoadCanceled);
 
             if (readFromAudioFile) {
                 // Only use original file path as saved file if it was an audio file.
@@ -376,6 +379,7 @@ namespace Kaixo::Processing {
                 performTransform(Transform::Identity, ops, { select.start - m_IdentityBufferOffset, select.size }, m_Cache.get(Transform::Identity));
             }
 
+            performNormalize(m_TransformProgress, m_TransformCanceled);
             if (m_CurrentTransform == Transform::Identity) {
                 buffer.startOffset = m_IdentityBufferOffset.load();
             } else {
@@ -421,6 +425,7 @@ namespace Kaixo::Processing {
             AnalyzeResult result;
             result.settings = settings;
             result.blocks.resize(blocks);
+            result.sampleRate = buffer.sampleRate();
 
             // ------------------------------------------------
 
@@ -660,6 +665,34 @@ namespace Kaixo::Processing {
 
         // ------------------------------------------------
 
+    }
+
+    void FileHandler::performNormalize(ProgressCounter& progress, std::atomic_bool& cancelled) {
+        buffer.access([&](juce::AudioBuffer<float>& bfr, float&, std::int64_t&) {
+            std::int64_t normalizeEstimate = 2 * bfr.getNumChannels() * bfr.getNumSamples();
+            progress.increaseEstimate(normalizeEstimate);
+
+            if (bfr.getNumSamples() == 0) return;
+
+            float max = 0;
+            for (int channel = 0; channel < bfr.getNumChannels(); ++channel) {
+                for (int sample = 0; sample < bfr.getNumSamples(); ++sample) {
+                    max = Math::max(max, Math::Fast::abs(bfr.getSample(channel, sample)));
+
+                    progress.step();
+                    if (cancelled) return;
+                }
+            }
+            
+            for (int channel = 0; channel < bfr.getNumChannels(); ++channel) {
+                for (int sample = 0; sample < bfr.getNumSamples(); ++sample) {
+                    bfr.setSample(channel, sample, bfr.getSample(channel, sample) / max);
+
+                    progress.step();
+                    if (cancelled) return;
+                }
+            }
+        });
     }
 
     // ------------------------------------------------
